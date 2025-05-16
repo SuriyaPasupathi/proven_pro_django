@@ -162,11 +162,6 @@ def verify_profile_share(request, token):
             status=status.HTTP_404_NOT_FOUND
         )
 
-
-
-
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_profile_share(request):
@@ -259,9 +254,9 @@ def submit_review(request, token):
         if not share.is_valid():
             return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create review data using the profile from the share object
+        # Create review data using the user from the share object
         review_data = {
-            'profile': share.user.id,  # Get profile ID from the share object
+            'user': share.user.id,  # Changed from 'profile' to 'user'
             'reviewer_name': request.data.get('reviewer_name'),
             'rating': request.data.get('rating'),
             'comment': request.data.get('comment')
@@ -295,21 +290,18 @@ def submit_review(request, token):
             'error': 'An error occurred while submitting the review'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_reviews(request):
-    # Get the profile associated with the current user
-    profile = request.user.profile
+    # Get the current user
+    user = request.user
     
-    # Get all reviews for this profile
-    reviews = Review.objects.filter(profile=profile).order_by('-created_at')
+    # Get all reviews for this user
+    reviews = Review.objects.filter(user=user).order_by('-created_at')
     
     # Serialize and return the reviews
     serializer = ReviewSerializer(reviews, many=True)
     return Response(serializer.data)
-
-
 
 # class CheckProfileStatusView(APIView):
 #     permission_classes = [IsAuthenticated]

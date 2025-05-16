@@ -15,6 +15,9 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 import logging  # Add this import               
 from django.conf import settings
+from django.core.mail import send_mail
+from .models import Users
+
 
 User = get_user_model()
 
@@ -147,18 +150,56 @@ def google_auth(request):
 
 class RegisterView(APIView):
     def post(self, request):
+        # Handle verification link clicks (YES/NO)
+        email = request.query_params.get("email")
+        choice = request.query_params.get("verify")
+
+        if email and choice:
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if choice == "yes":
+                user.is_verified = True
+                user.save()
+                return Response({"message": "Registration successful!"}, status=status.HTTP_200_OK)
+            elif choice == "no":
+                user.delete()
+                return Response({"message": "Registration cancelled."}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid choice."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Handle initial registration request
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
+            validated_data = serializer.validated_data
+            user = User.objects.create_user(**validated_data)
+            user.is_verified = False
+            user.save()
 
-            refresh = RefreshToken.for_user(user)
-            access = refresh.access_token
+            base_url = "http://127.0.0.1:8000"  # change to your backend/frontend domain
+            yes_url = f"{base_url}/api/register/?email={user.email}&verify=yes"
+            no_url = f"{base_url}/api/register/?email={user.email}&verify=no"
 
-            return Response({
-                "message": "Account created successfully!",
-                "refresh": str(refresh),
-                "access": str(access)
-            }, status=status.HTTP_201_CREATED)
+            message = f"""
+Hi {user.username},
+
+Please confirm your registration:
+
+✅ YES - {yes_url}
+❌ NO - {no_url}
+"""
+
+            send_mail(
+                "Confirm Your Registration",
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+
+            return Response({"message": "Verification email sent. Please confirm."}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -169,20 +210,25 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
-        user = User.objects.filter(email=email).first()
+        user = Users.objects.filter(email=email).first()
 
-        if user and user.check_password(password):
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                "message": "Login successful!",
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                }
-            }, status=status.HTTP_200_OK)
+        if user:
+            # Check if the is_verified field exists before checking it
+            if hasattr(user, 'is_verified') and not user.is_verified:
+                return Response({"detail": "Account not verified. Please confirm registration from your email."}, status=status.HTTP_403_FORBIDDEN)
+
+            if user.check_password(password):
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    "message": "Login successful!",
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                    }
+                }, status=status.HTTP_200_OK)
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -281,9 +327,16 @@ class PasswordResetConfirmView(APIView):
 
         try:
             # Decode the user ID
-            uid = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=uid)
-
+            decoded_uid = force_str(urlsafe_base64_decode(uid))
+            
+            # If your User model uses UUID as primary key
+            try:
+                user_uuid = uuid.UUID(decoded_uid)
+                user = User.objects.get(pk=user_uuid)
+            except (ValueError, TypeError):
+                # If conversion to UUID fails, try as string/int
+                user = User.objects.get(pk=decoded_uid)
+            
             # Check if the token is valid
             if default_token_generator.check_token(user, token):
                 user.set_password(new_password)
@@ -293,7 +346,7 @@ class PasswordResetConfirmView(APIView):
                 return Response({"error": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
                 
         except User.DoesNotExist:
-            return Response({"error": "Invalid user ID."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "User not found."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

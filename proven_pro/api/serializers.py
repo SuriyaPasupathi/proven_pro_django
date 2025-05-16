@@ -55,10 +55,16 @@ class SocialLinkSerializer(serializers.ModelSerializer):
         fields = ('id', 'platform', 'url')
 
 
+
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ('id', 'reviewer_name', 'rating', 'comment', 'created_at')
+        fields = ('id', 'user', 'reviewer_name', 'rating', 'comment', 'created_at')
+        # If you want to hide the user field in responses but allow it in creation:
+        extra_kwargs = {
+            'user': {'write_only': True}
+        }
+
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
