@@ -1,0 +1,29 @@
+# === Python / Django ===
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+db.sqlite3
+*.sqlite3
+.env
+.env.*
+.envrc
+*.log
+
+# Django specific
+media/
+staticfiles/
+local_settings.py
+migrations/
+profiles/
+management/
+__pytest_cache/
+
+# Virtual environment
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
