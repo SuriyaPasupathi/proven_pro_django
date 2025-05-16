@@ -1,5 +1,5 @@
 from django.db import models    
-from django.contrib.auth.models import AbstractUser as AbstractUser
+from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 import uuid
@@ -8,9 +8,11 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db.models import Avg
+from django.core.cache import cache
+
 
 class Users(AbstractUser):
-    # Base user fields
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     google_id = models.CharField(max_length=255, null=True, blank=True)
@@ -51,7 +53,7 @@ class Users(AbstractUser):
     education = models.TextField(blank=True)
     certifications = models.TextField(blank=True)
     licenses = models.TextField(blank=True)
-    portfolio = models.TextField(blank=True)
+    portfolio = models.FileField(upload_to='portfolio/', null=True, blank=True)
     video_intro = models.FileField(upload_to='videos/', null=True, blank=True)
     
     # URL for profile sharing
@@ -76,10 +78,8 @@ class Users(AbstractUser):
         if self.mobile_verified:
             percentage += 25
         
-        # Update the stored percentage
-        if self.verification_percentage != percentage:
-            self.verification_percentage = percentage
-            self.save(update_fields=['verification_percentage'])
+        # Cache the result to avoid recalculating it repeatedly
+        cache.set(f'{self.id}_verification_percentage', percentage, timeout=60 * 5)  # cache for 5 minutes
         
         return percentage
     
@@ -87,7 +87,6 @@ class Users(AbstractUser):
     REQUIRED_FIELDS = ['username']
     
     def save(self, *args, **kwargs):
-        # Generate a unique profile URL if not provided
         if not self.profile_url:
             self.profile_url = str(uuid.uuid4())[:8]
         super().save(*args, **kwargs)
@@ -102,12 +101,10 @@ class Users(AbstractUser):
     
     @property
     def name(self):
-        """Return the user's full name or username"""
         if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
         return self.username
 
-    # Add a method to send verification status email
     def send_verification_status_email(self, document_type, is_approved):
         status = "approved" if is_approved else "rejected"
         document_name = "Government ID" if document_type == "gov_id" else "Address Proof"
@@ -140,8 +137,14 @@ class Users(AbstractUser):
             logger.error(f"Failed to send verification email: {str(e)}")
 
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['subscription_start_date']),
+            models.Index(fields=['profile_url']),
+        ]
+
 class SocialLink(models.Model):
-    """Separate model for social media links to keep the data structure clean"""
     PLATFORM_CHOICES = [
         ('linkedin', 'LinkedIn'),
         ('facebook', 'Facebook'),
@@ -163,7 +166,6 @@ class SocialLink(models.Model):
 
 
 class Review(models.Model):
-    """Model for client reviews"""
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='client_reviews')
     reviewer_name = models.CharField(max_length=100)
     rating = models.IntegerField(
@@ -177,14 +179,15 @@ class Review(models.Model):
             raise ValidationError('Rating must be between 1 and 5')
         
     def save(self, *args, **kwargs):
-        self.full_clean()  # This will run validators and clean method
+        self.full_clean()
         super().save(*args, **kwargs)
         
         # Update the average rating on the user
         user = self.user
         reviews = user.client_reviews.all()
         if reviews:
-            user.rating = sum(review.rating for review in reviews) / reviews.count()
+            avg_rating = reviews.aggregate(Avg('rating'))['rating__avg']
+            user.rating = avg_rating
             user.save(update_fields=['rating'])
 
 
@@ -205,17 +208,12 @@ class ProfileShare(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-# Add signals to detect changes in verification status
+
 @receiver(post_save, sender=Users)
 def handle_verification_status_change(sender, instance, **kwargs):
-    # This is a simple implementation. For production, you might want to use a more
-    # sophisticated approach to detect actual changes in verification fields
     if kwargs.get('update_fields') and any(field in kwargs['update_fields'] for field in 
                                           ['gov_id_verified', 'address_verified']):
         if 'gov_id_verified' in kwargs['update_fields']:
             instance.send_verification_status_email('gov_id', instance.gov_id_verified)
         if 'address_verified' in kwargs['update_fields']:
             instance.send_verification_status_email('address', instance.address_verified)
-
-
-
