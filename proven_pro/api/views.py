@@ -45,9 +45,18 @@ class UserProfileView(APIView):
         subscription_type = subscription_type if subscription_type in ['free', 'standard', 'premium'] else 'free'
         user.subscription_type = subscription_type
 
-        base_fields = ['first_name', 'last_name', 'bio', 'job_title', 'job_specialization']
-        standard_fields = base_fields + ['mobile', 'services', 'experiences', 'skills', 'tools', 'languages', 'categories']
-        premium_fields = standard_fields + ['education', 'certifications', 'licenses', 'portfolio']
+        base_fields = ['first_name', 'last_name', 'bio', 'profile_email']
+        standard_fields = base_fields + [
+            'mobile', 'services_categories', 'services_description', 'rate_range', 'availability',
+            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
+            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description'
+        ]
+        premium_fields = standard_fields + [
+            'project_title', 'project_description', 'project_url', 'project_image',
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
+            'certifications_expiration_date', 'certifications_id', 'certifications_image',
+            'video_description'
+        ]
 
         subscription_fields = {
             'free': base_fields,
@@ -61,11 +70,15 @@ class UserProfileView(APIView):
 
         file_fields = {
             'profile_pic': 'profile_pic',
-            'video_intro': 'video_intro'
+            'video_intro': 'video_intro',
+            'project_image': 'project_image',
+            'certifications_image': 'certifications_image'
         }
 
         for key, attr in file_fields.items():
-            if files.get(key) and (key != 'video_intro' or subscription_type == 'premium'):
+            if files.get(key) and (key in ['profile_pic'] or 
+                                  (key in ['video_intro', 'project_image'] and subscription_type == 'premium') or
+                                  (key == 'certifications_image' and subscription_type == 'premium')):
                 setattr(user, attr, files[key])
 
         user.save()
