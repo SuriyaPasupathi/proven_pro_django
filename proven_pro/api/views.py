@@ -33,18 +33,55 @@ class UserProfileView(APIView):
 
     def get(self, request):
         user = request.user
+        
+        # Define fields based on subscription type
+        base_fields = ['id', 'username', 'email', 'subscription_type', 
+                      'first_name', 'last_name', 'bio', 'profile_pic_url', 
+                      'rating', 'profile_url', 'profile_email']
+        
+        standard_fields = base_fields + [
+            'mobile', 'services_categories', 'services_description', 'rate_range', 'availability',
+            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
+            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description'
+        ]
+        
+        premium_fields = standard_fields + [
+            'project_title', 'project_description', 'project_url', 'project_image_url',
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
+            'certifications_expiration_date', 'certifications_id', 'certifications_image_url',
+            'video_intro_url', 'video_description'
+        ]
+        
+        # Map subscription types to field sets
+        subscription_fields = {
+            'free': base_fields,
+            'standard': standard_fields,
+            'premium': premium_fields
+        }
+        
+        # Get user's subscription type
+        subscription_type = user.subscription_type
+        
+        # Use a custom serializer context to pass the fields
         serializer = UserProfileSerializer(user)
-        return Response(serializer.data)
+        
+        # Filter the serializer data based on subscription
+        allowed_fields = subscription_fields.get(subscription_type, base_fields)
+        filtered_data = {k: v for k, v in serializer.data.items() if k in allowed_fields}
+        
+        return Response(filtered_data)
 
     def post(self, request):
         user = request.user
         data = request.data
         files = request.FILES
-
+        
+        # Process text fields first
         subscription_type = data.get('subscription_type', 'free')
         subscription_type = subscription_type if subscription_type in ['free', 'standard', 'premium'] else 'free'
         user.subscription_type = subscription_type
-
+        
+        # Define fields based on subscription type
         base_fields = ['first_name', 'last_name', 'bio', 'profile_email']
         standard_fields = base_fields + [
             'mobile', 'services_categories', 'services_description', 'rate_range', 'availability',
@@ -52,47 +89,53 @@ class UserProfileView(APIView):
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description'
         ]
         premium_fields = standard_fields + [
-            'project_title', 'project_description', 'project_url', 'project_image',
+            'project_title', 'project_description', 'project_url',
             'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date', 'certifications_id', 'certifications_image',
+            'certifications_expiration_date', 'certifications_id',
             'video_description'
         ]
-
+        
         subscription_fields = {
             'free': base_fields,
             'standard': standard_fields,
             'premium': premium_fields
         }
-
+        
+        # Process text fields
         for field in subscription_fields[subscription_type]:
             if field in data:
                 setattr(user, field, data.get(field))
-
+        
+        # Process file fields separately
         file_fields = {
             'profile_pic': 'profile_pic',
             'video_intro': 'video_intro',
             'project_image': 'project_image',
             'certifications_image': 'certifications_image'
         }
-
+        
+        # Only process files that are actually in the request
         for key, attr in file_fields.items():
-            if files.get(key) and (key in ['profile_pic'] or 
-                                  (key in ['video_intro', 'project_image'] and subscription_type == 'premium') or
-                                  (key == 'certifications_image' and subscription_type == 'premium')):
-                setattr(user, attr, files[key])
-
+            if key in files:
+                # Check subscription type for premium features
+                if key == 'profile_pic' or (subscription_type == 'premium' and key in ['video_intro', 'project_image', 'certifications_image']):
+                    setattr(user, attr, files[key])
+        
         user.save()
-
+        
+        # Define response fields based on subscription
+        response_fields = ['id', 'username', 'email', 'subscription_type'] + subscription_fields[subscription_type]
+        
+        # Create filtered response
         response_data = {
-            field: getattr(user, field)
-            for field in subscription_fields[subscription_type]
-            if hasattr(user, field)
+            field: getattr(user, field) 
+            for field in response_fields 
+            if hasattr(user, field) and getattr(user, field) is not None
         }
-        response_data.update({
-            'message': 'Profile created successfully',
-            'subscription_type': subscription_type
-        })
-
+        
+        # Add message
+        response_data['message'] = 'Profile updated successfully'
+        
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     def put(self, request):

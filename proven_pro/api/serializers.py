@@ -78,11 +78,46 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     verification_status = serializers.IntegerField(read_only=True)
     
+    # Add these fields as write-only to avoid serialization issues
+    profile_pic = serializers.ImageField(write_only=True, required=False)
+    video_intro = serializers.FileField(write_only=True, required=False)
+    project_image = serializers.ImageField(write_only=True, required=False)
+    certifications_image = serializers.ImageField(write_only=True, required=False)
+    
+    # Add URL fields for reading the file URLs
+    profile_pic_url = serializers.SerializerMethodField(read_only=True)
+    video_intro_url = serializers.SerializerMethodField(read_only=True)
+    project_image_url = serializers.SerializerMethodField(read_only=True)
+    certifications_image_url = serializers.SerializerMethodField(read_only=True)
+    
+    def get_profile_pic_url(self, obj):
+        if obj.profile_pic:
+            return obj.profile_pic.url
+        return None
+    
+    def get_video_intro_url(self, obj):
+        if obj.video_intro:
+            return obj.video_intro.url
+        return None
+    
+    def get_project_image_url(self, obj):
+        if obj.project_image:
+            return obj.project_image.url
+        return None
+    
+    def get_certifications_image_url(self, obj):
+        if obj.certifications_image:
+            return obj.certifications_image.url
+        return None
+    
     class Meta:
         model = Users
         fields = (
-            'id', 'username', 'email', 'subscription_type', 'first_name', 'last_name', 'bio', 
-            'profile_pic', 'rating', 'profile_url', 'profile_email',
+            'id', 'username', 'email', 'subscription_type', 
+            
+            # Profile fields
+            'first_name', 'last_name', 'bio', 
+            'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail',
             'mobile', 
             
             'services_categories', 'services_description', 'rate_range', 'availability',
@@ -91,12 +126,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
             #tools & skills
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
             #portfolio
-            'project_title', 'project_description', 'project_url', 'project_image', 
+            'project_title', 'project_description', 'project_url', 'project_image', 'project_image_url',
             #certifications
             'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date','certifications_id', 'certifications_image',
+            'certifications_expiration_date','certifications_id', 'certifications_image', 'certifications_image_url',
             #video
-            'video_intro', 'video_description',
+            'video_intro', 'video_intro_url', 'video_description',
             # Read-only fields
             'social_links', 'client_reviews',
             # Write-only fields for social links
