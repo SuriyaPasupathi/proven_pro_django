@@ -82,9 +82,22 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = Users
         fields = (
             'id', 'username', 'email', 'subscription_type', 'first_name', 'last_name', 'bio', 
-            'profile_pic', 'job_title', 'job_specialization', 'rating', 'profile_url', 
-            'mobile', 'services', 'experiences', 'skills', 'tools', 'languages', 'categories',
-            'education', 'certifications', 'licenses', 'portfolio', 'video_intro', 
+            'profile_pic', 'rating', 'profile_url', 'profile_email',
+            'mobile', 
+            
+            'services_categories', 'services_description', 'rate_range', 'availability',
+            #work experience
+            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
+            #tools & skills
+            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
+            #portfolio
+            'project_title', 'project_description', 'project_url', 'project_image', 
+            #certifications
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
+            'certifications_expiration_date','certifications_id', 'certifications_image',
+            #video
+            'video_intro', 'video_description',
+            # Read-only fields
             'social_links', 'client_reviews',
             # Write-only fields for social links
             'linkedin', 'facebook', 'twitter',

@@ -35,26 +35,51 @@ class Users(AbstractUser):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
+    profile_email = models.EmailField(unique=True)
     profile_pic = models.ImageField(upload_to='user_profiles_pic/', null=True, blank=True)
-    job_title = models.CharField(max_length=100, blank=True)
-    job_specialization = models.CharField(max_length=100, blank=True)
+    # job_title = models.CharField(max_length=100, blank=True)
+    # job_specialization = models.CharField(max_length=100, blank=True)
     rating = models.FloatField(default=0)
     
     # Standard tier fields
     mobile = models.CharField(max_length=20, blank=True)
-    services = models.TextField(blank=True)
-    experiences = models.TextField(blank=True)
-    skills = models.TextField(blank=True)
-    tools = models.TextField(blank=True)
-    languages = models.TextField(blank=True)
-    categories = models.TextField(blank=True)
+    services_categories = models.TextField(blank=True)
+    services_description = models.TextField(blank=True)
+    rate_range = models.CharField(max_length=100, blank=True)
+    availability = models.TextField(blank=True)
+    #work experience
+    company_name = models.CharField(max_length=150, blank=True)
+    position = models.CharField(max_length=100, blank=True)
+    key_responsibilities = models.TextField(blank=True)
+    # job_description = models.TextField(blank=True)
+    # job_title = models.CharField(max_length=100, blank=True)
+    # job_description = models.TextField(blank=True)
+    experience_start_date = models.DateField(null=True, blank=True)
+    experience_end_date = models.DateField(null=True, blank=True)
+
+    #tools & skills
+    primary_tools = models.TextField(max_length=100, blank=True)
+    technical_skills = models.TextField(max_length=100, blank=True)
+    soft_skills = models.TextField(blank=True)
+    skills_description = models.TextField(blank=True)
+
+    #portfolio
+    project_title = models.CharField(max_length=100, blank=True)
+    project_description = models.TextField(blank=True)
+    project_url = models.URLField(blank=True)
+    project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+ 
     
-    # Premium tier fields
-    education = models.TextField(blank=True)
-    certifications = models.TextField(blank=True)
-    licenses = models.TextField(blank=True)
-    portfolio = models.FileField(upload_to='portfolio/', null=True, blank=True)
+    #linceses and certifications
+    certifications_name = models.CharField(max_length=100, blank=True)
+    certifications_issuer = models.CharField(max_length=100, blank=True)
+    certifications_issued_date = models.DateField(null=True, blank=True)
+    certifications_expiration_date = models.DateField(null=True, blank=True)
+    certifications_id= models.TextField(blank=True)
+    certifications_image = models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    
     video_intro = models.FileField(upload_to='videos/', null=True, blank=True)
+    video_description = models.TextField(blank=True)
     
     # URL for profile sharing
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
