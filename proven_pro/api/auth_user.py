@@ -17,7 +17,7 @@ import logging  # Add this import
 from django.conf import settings
 from django.core.mail import send_mail
 from .models import Users
-
+import random
 
 User = get_user_model()
 
@@ -150,58 +150,130 @@ def google_auth(request):
 
 class RegisterView(APIView):
     def post(self, request):
-        # Handle verification link clicks (YES/NO)
-        email = request.query_params.get("email")
-        choice = request.query_params.get("verify")
-
-        if email and choice:
+        print(f"Registration request data: {request.data}")
+        print(f"Request data type: {type(request.data)}")
+        print(f"Request data keys: {request.data.keys() if hasattr(request.data, 'keys') else 'No keys method'}")
+        
+        # Check if this is an OTP verification request
+        if 'otp' in request.data and 'email' in request.data and len(request.data) <= 2:
+            # This is an OTP verification request
+            otp = request.data.get("otp")
+            email = request.data.get("email")
+            
             try:
-                user = User.objects.get(email=email)
-            except User.DoesNotExist:
+                user = Users.objects.get(email=email)
+            except Users.DoesNotExist:
                 return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-            if choice == "yes":
+            # Convert OTP to string for comparison if it's not already
+            if not isinstance(otp, str):
+                otp = str(otp)
+                
+            print(f"Verifying OTP: {otp} for user: {email}, stored OTP: {user.otp}")
+                
+            if user.otp == otp:
                 user.is_verified = True
+                user.otp = None
                 user.save()
-                return Response({"message": "Registration successful!"}, status=status.HTTP_200_OK)
-            elif choice == "no":
-                user.delete()
-                return Response({"message": "Registration cancelled."}, status=status.HTTP_200_OK)
+                return Response({"message": "OTP verified. Registration successful!"}, status=status.HTTP_200_OK)
             else:
-                return Response({"error": "Invalid choice."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Handle initial registration request
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
+                return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # If we get here, this is a registration request, not an OTP verification
+        # Rest of your registration code remains the same...
+        try:
+            # Check for existing user before serializer validation
+            username = request.data.get('username')
+            email = request.data.get('email')
+            
+            # Debug existing users
+            username_exists = Users.objects.filter(username=username).exists()
+            email_exists = Users.objects.filter(email=email).exists()
+            print(f"Username '{username}' exists: {username_exists}")
+            print(f"Email '{email}' exists: {email_exists}")
+            
+            if username_exists or email_exists:
+                error_response = {
+                    "error": "Account already exists",
+                    "details": {}
+                }
+                
+                if username_exists:
+                    error_response["details"]["username"] = ["A user with that username already exists."]
+                
+                if email_exists:
+                    error_response["details"]["email"] = ["A user with this email already exists."]
+                
+                print(f"Returning error response: {error_response}")
+                return Response(error_response, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Continue with registration if user doesn't exist
+            print("User doesn't exist, proceeding with registration")
+            serializer = RegisterSerializer(data=request.data)
+            
+            if not serializer.is_valid():
+                print(f"Serializer validation failed: {serializer.errors}")
+                return Response({"error": "Validation failed", "details": serializer.errors}, 
+                               status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create user and send OTP
             validated_data = serializer.validated_data
-            user = User.objects.create_user(**validated_data)
+            print(f"Creating user with data: {validated_data}")
+            
+            user = Users.objects.create_user(**validated_data)
             user.is_verified = False
+
+            otp_code = str(random.randint(100000, 999999))
+            user.otp = otp_code
             user.save()
+            
+            print(f"User created with ID: {user.id}, sending OTP: {otp_code}")
 
-            base_url = "http://127.0.0.1:8000"  # change to your backend/frontend domain
-            yes_url = f"{base_url}/api/register/?email={user.email}&verify=yes"
-            no_url = f"{base_url}/api/register/?email={user.email}&verify=no"
+            try:
+                subject = "Your OTP for Registration"
+                message = f"""
+                Hi {user.username},
 
-            message = f"""
-Hi {user.username},
+                Your OTP for registration is: {otp_code}
 
-Please confirm your registration:
+                This OTP was requested for the account with email: {user.email}
 
-✅ YES - {yes_url}
-❌ NO - {no_url}
-"""
+                Please enter this code to complete your registration.
 
-            send_mail(
-                "Confirm Your Registration",
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
-
-            return Response({"message": "Verification email sent. Please confirm."}, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                Thank you,
+                The Team
+                """
+                
+                # Use the configured DEFAULT_FROM_EMAIL as the sender
+                from_email = settings.DEFAULT_FROM_EMAIL
+                # Send to the user's email address
+                recipient_list = [user.email]
+                
+                print(f"Sending email from {from_email} to {recipient_list}")
+                
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
+                    recipient_list=recipient_list,
+                    fail_silently=False,
+                )
+                
+                return Response({"message": "OTP sent to your email. Please enter it to complete registration."}, 
+                               status=status.HTTP_200_OK)
+            except Exception as email_error:
+                print(f"Failed to send email: {str(email_error)}")
+                # Don't delete the user, just return a message that the user was created but email failed
+                return Response({
+                    "message": "User registered successfully, but failed to send OTP email. Please contact support.",
+                    "error": str(email_error)
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            print(f"Exception during registration: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
 # Login View (Custom response with tokens)
