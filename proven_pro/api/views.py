@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
+from .profile_field.profile_fields import SUBSCRIPTION_FIELDS, FILE_FIELDS, URL_FIELDS
 from .models import Review, ProfileShare
 from django.conf import settings
 from django.utils import timezone
@@ -33,110 +34,40 @@ class UserProfileView(APIView):
 
     def get(self, request):
         user = request.user
-        
-        # Define fields based on subscription type
-        base_fields = ['id', 'username', 'email', 'subscription_type', 
-                      'first_name', 'last_name', 'bio', 'profile_pic_url', 
-                      'rating', 'profile_url', 'profile_email']
-        
-        standard_fields = base_fields + [
-            'mobile', 'services_categories', 'services_description', 'rate_range', 'availability',
-            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
-            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description'
-        ]
-        
-        premium_fields = standard_fields + [
-            'project_title', 'project_description', 'project_url', 'project_image_url',
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date', 'certifications_id', 'certifications_image_url',
-            'video_intro_url', 'video_description'
-        ]
-        
-        # Map subscription types to field sets
-        subscription_fields = {
-            'free': base_fields,
-            'standard': standard_fields,
-            'premium': premium_fields
-        }
-        
-        # Get user's subscription type
-        subscription_type = user.subscription_type
-        
-        # Use a custom serializer context to pass the fields
+        print(f"User subscription type: {user.subscription_type}")
+        subscription_type = user.subscription_type if user.subscription_type in SUBSCRIPTION_FIELDS else 'free'
+
+        # Serialize the user
         serializer = UserProfileSerializer(user)
-        
-        # Filter the serializer data based on subscription
-        allowed_fields = subscription_fields.get(subscription_type, base_fields)
-        filtered_data = {k: v for k, v in serializer.data.items() if k in allowed_fields}
-        
+
+        # Filter response fields based on subscription type
+        allowed_fields = SUBSCRIPTION_FIELDS[subscription_type] + ['id', 'username', 'email', 'subscription_type'] + URL_FIELDS
+        filtered_data = {
+            key: value
+            for key, value in serializer.data.items()
+            if key in allowed_fields
+        }
+
         return Response(filtered_data)
 
     def post(self, request):
         user = request.user
-        data = request.data
-        files = request.FILES
         
-        # Process text fields first
-        subscription_type = data.get('subscription_type', 'free')
-        subscription_type = subscription_type if subscription_type in ['free', 'standard', 'premium'] else 'free'
-        user.subscription_type = subscription_type
+        # Combine data and files into a single dictionary
+        data = request.data.copy()
+        for key, file in request.FILES.items():
+            data[key] = file
         
-        # Define fields based on subscription type
-        base_fields = ['first_name', 'last_name', 'bio', 'profile_email']
-        standard_fields = base_fields + [
-            'mobile', 'services_categories', 'services_description', 'rate_range', 'availability',
-            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
-            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description'
-        ]
-        premium_fields = standard_fields + [
-            'project_title', 'project_description', 'project_url',
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date', 'certifications_id',
-            'video_description'
-        ]
+        serializer = UserProfileSerializer(user, data=data, partial=True)
         
-        subscription_fields = {
-            'free': base_fields,
-            'standard': standard_fields,
-            'premium': premium_fields
-        }
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Profile updated successfully',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
         
-        # Process text fields
-        for field in subscription_fields[subscription_type]:
-            if field in data:
-                setattr(user, field, data.get(field))
-        
-        # Process file fields separately
-        file_fields = {
-            'profile_pic': 'profile_pic',
-            'video_intro': 'video_intro',
-            'project_image': 'project_image',
-            'certifications_image': 'certifications_image'
-        }
-        
-        # Only process files that are actually in the request
-        for key, attr in file_fields.items():
-            if key in files:
-                # Check subscription type for premium features
-                if key == 'profile_pic' or (subscription_type == 'premium' and key in ['video_intro', 'project_image', 'certifications_image']):
-                    setattr(user, attr, files[key])
-        
-        user.save()
-        
-        # Define response fields based on subscription
-        response_fields = ['id', 'username', 'email', 'subscription_type'] + subscription_fields[subscription_type]
-        
-        # Create filtered response
-        response_data = {
-            field: getattr(user, field) 
-            for field in response_fields 
-            if hasattr(user, field) and getattr(user, field) is not None
-        }
-        
-        # Add message
-        response_data['message'] = 'Profile updated successfully'
-        
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
         user = request.user
