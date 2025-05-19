@@ -35,7 +35,7 @@ class Users(AbstractUser):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
-    profile_mail = models.EmailField(unique=True, blank=True)
+    profile_mail = models.EmailField(unique=True, blank=True, null=True)
     profile_pic = models.ImageField(upload_to='user_profiles_pic/', null=True, blank=True)
     # job_title = models.CharField(max_length=100, blank=True)
     # job_specialization = models.CharField(max_length=100, blank=True)
