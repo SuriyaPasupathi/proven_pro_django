@@ -120,6 +120,13 @@ def google_auth(request):
             refresh = RefreshToken.for_user(user)
             print(f"Generated tokens for user: {user.email}")
 
+            # Check if user has completed their profile
+            has_profile = bool(
+                user.first_name and 
+                user.last_name and 
+                hasattr(user, 'job_title') and user.job_title
+            )
+
             return Response({
                 'message': 'Login successful!',
                 'access': str(refresh.access_token),
@@ -130,7 +137,9 @@ def google_auth(request):
                     'email': user.email,
                     'first_name': user.first_name,
                     'last_name': user.last_name,
-                }
+                },
+                'has_profile': has_profile,
+                'subscription_type': user.subscription_type
             })
 
         except Exception as user_error:
@@ -219,6 +228,15 @@ class LoginView(APIView):
 
             if user.check_password(password):
                 refresh = RefreshToken.for_user(user)
+                
+                # Check if user has completed their profile
+                has_profile = bool(
+                    user.first_name and 
+                    user.last_name and 
+                    hasattr(user, 'job_title') and user.job_title
+                )
+                
+                # Include profile status in response
                 return Response({
                     "message": "Login successful!",
                     "access": str(refresh.access_token),
@@ -227,7 +245,11 @@ class LoginView(APIView):
                         "id": user.id,
                         "username": user.username,
                         "email": user.email,
-                    }
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                    },
+                    "has_profile": has_profile,
+                    "subscription_type": user.subscription_type
                 }, status=status.HTTP_200_OK)
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
