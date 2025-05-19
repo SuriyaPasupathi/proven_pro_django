@@ -19,7 +19,8 @@ from .views import (
     GetVerificationStatusView,
     admin_document_approval_webhook,
     UserSearchFilterView,
-    health_check
+    health_check,
+    CheckProfileStatusView
 )
 
 router = DefaultRouter()
@@ -31,7 +32,7 @@ urlpatterns = [
     path('google-auth/', google_auth, name='google-auth'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
-    # path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status')
+    # path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status'),
     path('request-reset-password/', RequestResetPasswordView.as_view(), name='request-reset-password'),
     path('reset-password-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     path('logout/', LogoutView.as_view(), name='logout'),

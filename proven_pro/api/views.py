@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
-from .profile_field.profile_fields import SUBSCRIPTION_FIELDS, FILE_FIELDS, URL_FIELDS
+import json , os
 from .models import Review, ProfileShare
 from django.conf import settings
 from django.utils import timezone
@@ -27,6 +27,14 @@ Users = get_user_model()
 def health_check(request):
     return JsonResponse({"status_api_working": "ok"})
 
+# Correct full path to JSON file inside your app folder
+json_file_path = os.path.join(settings.BASE_DIR, 'api', 'profile_fields.json')
+print(json_file_path,"asdgiuagsiudysa")
+with open(json_file_path) as file:
+    profile_fields = json.load(file)
+    SUBSCRIPTION_FIELDS = profile_fields["SUBSCRIPTION_FIELDS"]
+    FILE_FIELDS = profile_fields["FILE_FIELDS"]
+    URL_FIELDS = profile_fields["URL_FIELDS"] 
 
 class UserProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -121,6 +129,7 @@ class UserSearchFilterView(APIView):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def verify_profile_share(request, token):
     try:
         # Convert string token to UUID if needed
@@ -290,26 +299,26 @@ def get_reviews(request):
     serializer = ReviewSerializer(reviews, many=True)
     return Response(serializer.data)
 
-# class CheckProfileStatusView(APIView):
-#     permission_classes = [IsAuthenticated]
+class CheckProfileStatusView(APIView):
+    permission_classes = [IsAuthenticated]
     
-#     def get(self, request):
-#         """
-#         Check if the user has completed their profile
-#         """
-#         user = request.user
+    def get(self, request):
+        """
+        Check if the user has completed their profile
+        """
+        user = request.user
         
-#         # Check if essential profile fields are filled
-#         has_profile = bool(
-#             user.first_name and 
-#             user.last_name and 
-#             user.job_title
-#         )
+        # Check if essential profile fields are filled
+        has_profile = bool(
+            user.first_name and 
+            user.last_name and 
+            user.job_title
+        )
         
-#         return Response({
-#             'has_profile': has_profile,
-#             'subscription_type': user.subscription_type
-#         })
+        return Response({
+            'has_profile': has_profile,
+            'subscription_type': user.subscription_type
+        })
 
 class UploadVerificationDocumentView(APIView):
     permission_classes = [IsAuthenticated]
