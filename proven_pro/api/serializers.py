@@ -68,7 +68,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 class ExperienceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experience
-        fields = ('id', 'company_name', 'position', 'key_responsibilities', 'start_date', 'end_date')
+        fields = ('id', 'user', 'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date')
 
 
 class CertificationSerializer(serializers.ModelSerializer):
@@ -81,8 +81,8 @@ class CertificationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Certification
-        fields = ('id', 'name', 'issuer', 'issued_date', 'expiration_date', 'credential_id', 
-                  'certificate_image', 'certificate_image_url')
+        fields = ('id', 'user', 'certifications_name', 'certifications_issuer', 'certifications_issued_date', 'certifications_expiration_date', 'certifications_id', 
+                  'certifications_image', 'certifications_image_url')
         extra_kwargs = {
             'certificate_image': {'write_only': True}
         }
@@ -91,7 +91,7 @@ class CertificationSerializer(serializers.ModelSerializer):
 class ServiceCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceCategory
-        fields = ('id', 'name')
+        fields = ('id', 'user', 'services_categories', 'services_description', 'rate_range', 'availability')
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -104,7 +104,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Project
-        fields = ('id', 'title', 'description', 'url', 'image', 'image_url')
+        fields = ('id'  ,'user', 'project_title', 'project_description', 'project_url', 'project_image', 'project_image_url')
         extra_kwargs = {
             'image': {'write_only': True}
         }

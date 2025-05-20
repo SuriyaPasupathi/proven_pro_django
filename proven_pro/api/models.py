@@ -38,9 +38,7 @@ class Users(AbstractUser):
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
-    services_description = models.TextField(blank=True)
-    rate_range = models.CharField(max_length=100, blank=True)
-    availability = models.TextField(blank=True)
+   
 
     primary_tools = models.TextField(max_length=100, blank=True)
     technical_skills = models.TextField(max_length=100, blank=True)
@@ -126,31 +124,36 @@ class Experience(models.Model):
     company_name = models.CharField(max_length=150)
     position = models.CharField(max_length=100)
     key_responsibilities = models.TextField(blank=True)
-    start_date = models.DateField()
-    end_date = models.DateField(null=True, blank=True)
+    experience_start_date = models.DateField()
+    experience_end_date = models.DateField(null=True, blank=True)
 
 
 class Certification(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='certifications')
-    name = models.CharField(max_length=100)
-    issuer = models.CharField(max_length=100)
-    issued_date = models.DateField()
-    expiration_date = models.DateField(null=True, blank=True)
-    credential_id = models.TextField(blank=True)
-    certificate_image = models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    certifications_name = models.CharField(max_length=100)
+    certifications_issuer = models.CharField(max_length=100)
+    certifications_issued_date = models.DateField()
+    certifications_expiration_date = models.DateField(null=True, blank=True)
+    certifications_id = models.TextField(blank=True)
+    certifications_image =models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    certifications_image_url = models.URLField(blank=True, null=True)
 
 
 class ServiceCategory(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='categories')
-    name = models.CharField(max_length=100)
+    services_categories = models.TextField(blank=True)
+    services_description = models.TextField(blank=True)
+    rate_range = models.CharField(max_length=100, blank=True)
+    availability = models.TextField(blank=True)
 
 
 class Project(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
-    title = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    url = models.URLField(blank=True)
-    image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+    project_title = models.CharField(max_length=100)
+    project_description = models.TextField(blank=True)
+    project_url = models.URLField(blank=True)
+    project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+    project_image_url = models.URLField(blank=True, null=True)
 
 
 class SocialLink(models.Model):
