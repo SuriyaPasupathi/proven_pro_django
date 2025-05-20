@@ -3,7 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from .auth_user import (
-    OTPViewSet, LoginView, google_auth, RequestResetPasswordView, 
+    RegisterViewSet, LoginView, google_auth, RequestResetPasswordView, 
     PasswordResetConfirmView, LogoutView
 )
 from .subscription import(
@@ -23,8 +23,7 @@ from .views import (
     admin_document_approval_webhook,
     UserSearchFilterView,
     health_check,
-    CheckProfileStatusView,
-    RegisterViewSet
+    CheckProfileStatusView, 
 )
 
 router = DefaultRouter()
