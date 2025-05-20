@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import SocialLink, Review, ProfileShare
+from .models import SocialLink, Review, ProfileShare, Experience, Certification, ServiceCategory, Project
 import re
 
 Users = get_user_model()
@@ -55,7 +55,6 @@ class SocialLinkSerializer(serializers.ModelSerializer):
         fields = ('id', 'platform', 'url')
 
 
-
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
@@ -66,10 +65,58 @@ class ReviewSerializer(serializers.ModelSerializer):
         }
 
 
+class ExperienceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experience
+        fields = ('id', 'company_name', 'position', 'key_responsibilities', 'start_date', 'end_date')
+
+
+class CertificationSerializer(serializers.ModelSerializer):
+    certificate_image_url = serializers.SerializerMethodField(read_only=True)
+    
+    def get_certificate_image_url(self, obj):
+        if obj.certificate_image:
+            return obj.certificate_image.url
+        return None
+    
+    class Meta:
+        model = Certification
+        fields = ('id', 'name', 'issuer', 'issued_date', 'expiration_date', 'credential_id', 
+                  'certificate_image', 'certificate_image_url')
+        extra_kwargs = {
+            'certificate_image': {'write_only': True}
+        }
+
+
+class ServiceCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceCategory
+        fields = ('id', 'name')
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField(read_only=True)
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
+    
+    class Meta:
+        model = Project
+        fields = ('id', 'title', 'description', 'url', 'image', 'image_url')
+        extra_kwargs = {
+            'image': {'write_only': True}
+        }
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     social_links = SocialLinkSerializer(many=True, read_only=True)
     client_reviews = ReviewSerializer(many=True, read_only=True)
+    experiences = ExperienceSerializer(many=True, read_only=True)
+    certifications = CertificationSerializer(many=True, read_only=True)
+    categories = ServiceCategorySerializer(many=True, read_only=True)
+    projects = ProjectSerializer(many=True, read_only=True)
     
     # Fields for nested creation
     linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
@@ -81,14 +128,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     # Add these fields as write-only to avoid serialization issues
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
-    project_image = serializers.ImageField(write_only=True, required=False)
-    certifications_image = serializers.ImageField(write_only=True, required=False)
     
     # Add URL fields for reading the file URLs
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
     video_intro_url = serializers.SerializerMethodField(read_only=True)
-    project_image_url = serializers.SerializerMethodField(read_only=True)
-    certifications_image_url = serializers.SerializerMethodField(read_only=True)
     
     def get_profile_pic_url(self, obj):
         if obj.profile_pic:
@@ -100,42 +143,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.video_intro.url
         return None
     
-    def get_project_image_url(self, obj):
-        if obj.project_image:
-            return obj.project_image.url
-        return None
-    
-    def get_certifications_image_url(self, obj):
-        if obj.certifications_image:
-            return obj.certifications_image.url
-        return None
-    
     class Meta:
         model = Users
         fields = (
-            'id', 'username', 'email', 'subscription_type', 
+            'id', 'username', 'email', 'subscription_type', 'subscription_active',
+            'subscription_start_date', 'subscription_end_date',
             
             # Profile fields
             'first_name', 'last_name', 'bio', 
             'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail',
             'mobile', 
             
-            'services_categories', 'services_description', 'rate_range', 'availability',
-            #work experience
-            'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date',
-            #tools & skills
+            'services_description', 'rate_range', 'availability',
+            
+            # Tools & skills
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
-            #portfolio
-            'project_title', 'project_description', 'project_url', 'project_image', 'project_image_url',
-            #certifications
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date','certifications_id', 'certifications_image', 'certifications_image_url',
-            #video
+            
+            # Video
             'video_intro', 'video_intro_url', 'video_description',
-            # Read-only fields
-            'social_links', 'client_reviews',
+            
+            # Related models
+            'social_links', 'client_reviews', 'experiences', 'certifications', 
+            'categories', 'projects',
+            
             # Write-only fields for social links
             'linkedin', 'facebook', 'twitter',
+            
+            # Verification fields
             'gov_id_document', 'gov_id_verified',
             'address_document', 'address_verified',
             'mobile_verified', 'verification_status',
@@ -198,6 +232,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class RequestPasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     """
     Serializer for confirming password reset and setting new password
@@ -237,27 +272,46 @@ class ProfileShareSerializer(serializers.ModelSerializer):
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
+    experiences = ExperienceSerializer(many=True, read_only=True)
+    certifications = CertificationSerializer(many=True, read_only=True)
+    projects = ProjectSerializer(many=True, read_only=True)
+    profile_pic_url = serializers.SerializerMethodField(read_only=True)
+    video_intro_url = serializers.SerializerMethodField(read_only=True)
+    
+    def get_profile_pic_url(self, obj):
+        if obj.profile_pic:
+            return obj.profile_pic.url
+        return None
+    
+    def get_video_intro_url(self, obj):
+        if obj.video_intro:
+            return obj.video_intro.url
+        return None
+    
     class Meta:
         model = Users
         fields = [
             'id',
             'first_name',
             'last_name',
-            'profile_pic',
-            'job_title',
-            'job_specialization',
+            'profile_pic_url',
             'rating',
             'subscription_type',
             'email',
             'mobile',
-            'services',
+            'bio',
+            'services_description',
+            'rate_range',
+            'availability',
+            'primary_tools',
+            'technical_skills',
+            'soft_skills',
+            'skills_description',
+            'video_intro_url',
+            'video_description',
             'experiences',
-            'skills',
-            'tools',
-            'education',
             'certifications',
-            'portfolio',
-            'video_intro'
+            'projects'
         ]
 
 
