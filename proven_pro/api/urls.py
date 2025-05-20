@@ -35,7 +35,7 @@ urlpatterns = [
     #auth
     path('google-auth/', google_auth, name='google-auth'),
     path('login/', LoginView.as_view(), name='login'),
-    # path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status'),
+    path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status'),
     path('request-reset-password/', RequestResetPasswordView.as_view(), name='request-reset-password'),
     path('reset-password-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     path('logout/', LogoutView.as_view(), name='logout'),

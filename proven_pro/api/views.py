@@ -11,7 +11,7 @@ from .models import Review, ProfileShare
 from django.conf import settings
 from django.utils import timezone
 import uuid
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.mail import send_mail
 import requests
 from django.views.decorators.csrf import csrf_exempt
@@ -39,7 +39,7 @@ with open(json_file_path) as file:
     URL_FIELDS = profile_fields["URL_FIELDS"] 
 
 class UserProfileView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -63,15 +63,32 @@ class UserProfileView(APIView):
     def post(self, request):
         user = request.user
         
-        # Combine data and files into a single dictionary
-        data = request.data.copy()
-        for key, file in request.FILES.items():
-            data[key] = file
+        # Handle file uploads and data separately to avoid pickling errors
+        data = {}
+        files = {}
         
+        # Safely extract data fields
+        for key in request.data:
+            if key in request.FILES:
+                files[key] = request.FILES[key]
+            else:
+                data[key] = request.data[key]
+        
+        # Create a serializer with both data and files
         serializer = UserProfileSerializer(user, data=data, partial=True)
         
         if serializer.is_valid():
-            serializer.save()
+            # Save the data fields
+            instance = serializer.save()
+            
+            # Handle file fields separately
+            for key, file in files.items():
+                setattr(instance, key, file)
+            
+            # Save again if there were files
+            if files:
+                instance.save()
+            
             return Response({
                 'message': 'Profile updated successfully',
                 'data': serializer.data
@@ -297,10 +314,53 @@ class CheckProfileStatusView(APIView):
             user.job_title
         )
         
+        # Add more detailed profile completion information
+        profile_fields = {
+            'first_name': bool(user.first_name),
+            'last_name': bool(user.last_name),
+            'job_title': bool(user.job_title),
+            'bio': bool(getattr(user, 'bio', None)),
+            'profile_picture': bool(getattr(user, 'profile_picture', None)),
+            'skills': bool(getattr(user, 'skills', None))
+        }
+        
+        # Calculate completion percentage
+        completed_fields = sum(1 for value in profile_fields.values() if value)
+        total_fields = len(profile_fields)
+        completion_percentage = int((completed_fields / total_fields) * 100)
+        
         return Response({
             'has_profile': has_profile,
-            'subscription_type': user.subscription_type
+            'subscription_type': user.subscription_type,
+            'profile_completion': {
+                'percentage': completion_percentage,
+                'fields': profile_fields
+            },
+            'next_steps': self._get_next_steps(profile_fields)
         })
+    
+    def _get_next_steps(self, profile_fields):
+        """
+        Generate suggestions for next steps to complete profile
+        """
+        next_steps = []
+        
+        if not profile_fields['first_name'] or not profile_fields['last_name']:
+            next_steps.append("Add your full name")
+        
+        if not profile_fields['job_title']:
+            next_steps.append("Add your job title")
+        
+        if not profile_fields['bio']:
+            next_steps.append("Write a professional bio")
+        
+        if not profile_fields['profile_picture']:
+            next_steps.append("Upload a profile picture")
+        
+        if not profile_fields['skills']:
+            next_steps.append("Add your skills")
+        
+        return next_steps
 
 class UploadVerificationDocumentView(APIView):
     permission_classes = [IsAuthenticated]
