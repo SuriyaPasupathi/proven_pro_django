@@ -2,7 +2,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from .auth_user import RegisterView,LoginView,google_auth,RequestResetPasswordView,PasswordResetConfirmView,LogoutView
+from .auth_user import (
+    OTPViewSet, LoginView, google_auth, RequestResetPasswordView, 
+    PasswordResetConfirmView, LogoutView
+)
 from .subscription import(
     SubscriptionCheckView,
     UpdateSubscriptionView,CreateGCashPaymentView,VerifyPaymentView,PayMongoWebhookView,GCashWebhookView)
@@ -20,22 +23,26 @@ from .views import (
     admin_document_approval_webhook,
     UserSearchFilterView,
     health_check,
-    CheckProfileStatusView
+    CheckProfileStatusView,
+    RegisterViewSet
 )
 
 router = DefaultRouter()
+router.register(r'register', RegisterViewSet, basename='otp')
 # router.register(r'reviews', ReviewViewSet)
 
 urlpatterns = [
     path('health_check', health_check, name='health_check'),
     #auth
     path('google-auth/', google_auth, name='google-auth'),
-    path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
     # path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status'),
     path('request-reset-password/', RequestResetPasswordView.as_view(), name='request-reset-password'),
     path('reset-password-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    
+    # Include router URLs
+    path('', include(router.urls)),
 
     #profile
     path('share-profile/', generate_profile_share, name='share-profile'),

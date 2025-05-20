@@ -19,6 +19,8 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from .models import Users
 import random
+from rest_framework import viewsets
+from rest_framework.decorators import action
 
 User = get_user_model()
 
@@ -158,49 +160,18 @@ def google_auth(request):
                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class RegisterView(APIView):
-    def post(self, request):
+class RegisterViewSet(viewsets.ViewSet):
+    """
+    ViewSet for handling OTP operations: registration, verification, and resending
+    """
+    permission_classes = [AllowAny]
+    
+    def create(self, request):
+        """
+        Register a new user and send OTP (POST /api/otp/)
+        """
         print(f"Registration request data: {request.data}")
         
-        # Check if this is an OTP verification request
-        if 'otp' in request.data and 'email' in request.data and len(request.data) <= 3:
-            # This is an OTP verification request
-            otp = request.data.get("otp")
-            email = request.data.get("email")
-            
-            try:
-                user = Users.objects.get(email=email)
-            except Users.DoesNotExist:
-                return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
-            # Convert OTP to string for comparison if it's not already
-            if not isinstance(otp, str):
-                otp = str(otp)
-                
-            print(f"Verifying OTP: {otp} for user: {email}, stored OTP: {user.otp}")
-                
-            if user.otp == otp:
-                user.is_verified = True
-                user.otp = None
-                user.save()
-                
-                # Generate JWT tokens
-                refresh = RefreshToken.for_user(user)
-                
-                return Response({
-                    "message": "OTP verified. Registration successful!",
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email
-                    }
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # If we get here, this is a registration request, not an OTP verification
         try:
             # Check for existing user before serializer validation
             username = request.data.get('username')
@@ -239,62 +210,167 @@ class RegisterView(APIView):
             user = Users.objects.create_user(**validated_data)
             user.is_verified = False  # User needs to verify OTP
 
-            # Generate OTP
-            otp_code = str(random.randint(100000, 999999))
-            user.otp = otp_code
-            user.save()
+            # Generate and send OTP
+            self._generate_and_send_otp(user)
             
-            print(f"User created with ID: {user.id}, sending OTP: {otp_code}")
-
-            try:
-                # Context for the template
-                context = {
-                    'username': user.username,
-                    'email': user.email,
-                    'otp_code': otp_code
-                }
-                
-                # Render HTML and text content from templates
-                html_content = render_to_string('emails/otp_email.html', context)
-                # text_content = render_to_string('emails/otp_email.txt', context)
-                
-                subject = "Your OTP for Registration"
-                from_email = settings.DEFAULT_FROM_EMAIL
-                to_email = user.email
-                
-                # Create email message with both HTML and text versions
-                email = EmailMultiAlternatives(
-                    subject=subject,
-                    body=html_content,
-                    from_email=from_email,
-                    to=[to_email]
-                )
-                email.attach_alternative(html_content, "text/html")
-                email.send()
-                
-                print(f"OTP email sent to {to_email}")
-                
-                return Response({
-                    "message": "OTP sent to your email. Please enter it to complete registration.",
-                    "email": user.email
-                }, status=status.HTTP_200_OK)
-                
-            except Exception as email_error:
-                print(f"Failed to send OTP email: {str(email_error)}")
-                import traceback
-                print(traceback.format_exc())
-                
-                # Don't delete the user, just return a message that the user was created but email failed
-                return Response({
-                    "message": "User registered successfully, but failed to send OTP email. Please contact support.",
-                    "error": str(email_error)
-                }, status=status.HTTP_201_CREATED)
+            return Response({
+                "message": "OTP sent to your email. Please enter it to complete registration.",
+                "email": user.email
+            }, status=status.HTTP_200_OK)
                 
         except Exception as e:
             print(f"Exception during registration: {str(e)}")
             import traceback
             print(traceback.format_exc())
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # Login View (Custom response with tokens)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def verify(self, request):
+        """
+        Verify OTP for user registration (POST /api/otp/verify/)
+        """
+        otp = request.data.get("otp")
+        email = request.data.get("email")
+        
+        if not otp or not email:
+            return Response({"error": "OTP and email are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = Users.objects.get(email=email)
+            
+            # Check if user is already verified
+            if user.is_verified:
+                # Generate JWT tokens for already verified user
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    "message": "User is already verified",
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Convert OTP to string for comparison if it's not already
+            if not isinstance(otp, str):
+                otp = str(otp)
+                
+            print(f"Verifying OTP: {otp} for user: {email}, stored OTP: {user.otp}")
+                
+            if user.otp == otp:
+                user.is_verified = True
+                user.otp = None
+                user.save()
+                
+                # Generate JWT tokens
+                refresh = RefreshToken.for_user(user)
+                
+                return Response({
+                    "message": "OTP verified. Registration successful!",
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Users.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print(f"Error verifying OTP: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def resend(self, request):
+        """
+        Resend OTP to user's email (POST /api/otp/resend/)
+        """
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = Users.objects.get(email=email)
+            
+            # Check if user is already verified
+            if user.is_verified:
+                return Response({
+                    "error": "User is already verified",
+                    "verified": True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate and send new OTP
+            success = self._generate_and_send_otp(user)
+            
+            if success:
+                return Response({
+                    "message": "New OTP sent to your email",
+                    "email": user.email
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": "Failed to send OTP email. Please try again later."
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Users.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print(f"Error resending OTP: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _generate_and_send_otp(self, user):
+        """Generate OTP and send it to the user's email"""
+        # Generate OTP
+        otp_code = str(random.randint(100000, 999999))
+        user.otp = otp_code
+        user.save()
+        
+        print(f"Generated OTP for user {user.email}: {otp_code}")
+        
+        try:
+            # Context for the template
+            context = {
+                'username': user.username,
+                'email': user.email,
+                'otp_code': otp_code
+            }
+            
+            # Render HTML content from template
+            html_content = render_to_string('emails/otp_email.html', context)
+            
+            subject = "Your OTP for Registration"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            to_email = user.email
+            
+            # Create email message with HTML version
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=html_content,
+                from_email=from_email,
+                to=[to_email]
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+            
+            print(f"OTP email sent to {to_email}")
+            return True
+            
+        except Exception as email_error:
+            print(f"Failed to send OTP email: {str(email_error)}")
+            import traceback
+            print(traceback.format_exc())
+            return False
 
 class LoginView(APIView):
     def post(self, request):
