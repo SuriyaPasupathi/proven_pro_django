@@ -153,7 +153,6 @@ class Project(models.Model):
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
     project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
-    project_image_url = models.URLField(blank=True, null=True)
 
 
 class SocialLink(models.Model):

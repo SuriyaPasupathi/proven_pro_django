@@ -44,25 +44,15 @@ class UserProfileView(APIView):
 
     def get(self, request):
         user = request.user
-        print(f"User subscription type: {user.subscription_type}")
-        subscription_type = user.subscription_type if user.subscription_type in SUBSCRIPTION_FIELDS else 'free'
-
-        # Serialize the user
+        
+        # Serialize the user with all related data
         serializer = UserProfileSerializer(user)
-
-        # Filter response fields based on subscription type
-        allowed_fields = SUBSCRIPTION_FIELDS[subscription_type] + ['id', 'username', 'email', 'subscription_type'] + URL_FIELDS
-        filtered_data = {
-            key: value
-            for key, value in serializer.data.items()
-            if key in allowed_fields
-        }
-
-        return Response(filtered_data)
+        
+        # Return the complete serialized data without filtering
+        return Response(serializer.data)
 
     def post(self, request):
         user = request.user
-        
         # Handle file uploads and data separately to avoid pickling errors
         data = {}
         files = {}
@@ -73,6 +63,33 @@ class UserProfileView(APIView):
                 files[key] = request.FILES[key]
             else:
                 data[key] = request.data[key]
+        
+        # Print the data for debugging
+        print("Received data:", data)
+        print("Received files:", files)
+        
+        # Handle project_image_url and project_image specially
+        if 'project_image_url' in data:
+            # Remove project_image_url from data as it's not needed for saving
+            data.pop('project_image_url')
+        
+        # If project_image is a string but not a file, remove it
+        if 'project_image' in data and not isinstance(data['project_image'], (list, tuple)) and not data['project_image'].startswith('data:'):
+            try:
+                # Check if it's a JSON string
+                import json
+                json_data = json.loads(data['project_image'])
+                # If it's an empty object or list, remove it
+                if not json_data or (isinstance(json_data, list) and len(json_data) == 0):
+                    data.pop('project_image')
+            except:
+                # If it's not valid JSON, keep it (might be a file path)
+                pass
+        
+        # Remove project_image if it's a string representation of an empty array or object
+        if 'project_image' in data and isinstance(data['project_image'], str):
+            if data['project_image'] in ['[]', '{}', '[{}]']:
+                data.pop('project_image')
         
         # Create a serializer with both data and files
         serializer = UserProfileSerializer(user, data=data, partial=True)
@@ -93,6 +110,8 @@ class UserProfileView(APIView):
                 'message': 'Profile updated successfully',
                 'data': serializer.data
             }, status=status.HTTP_200_OK)
+        else:
+            print("Serializer errors:", serializer.errors)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -310,15 +329,13 @@ class CheckProfileStatusView(APIView):
         # Check if essential profile fields are filled
         has_profile = bool(
             user.first_name and 
-            user.last_name and 
-            user.job_title
+            user.last_name 
         )
         
         # Add more detailed profile completion information
         profile_fields = {
             'first_name': bool(user.first_name),
             'last_name': bool(user.last_name),
-            'job_title': bool(user.job_title),
             'bio': bool(getattr(user, 'bio', None)),
             'profile_picture': bool(getattr(user, 'profile_picture', None)),
             'skills': bool(getattr(user, 'skills', None))
@@ -347,9 +364,6 @@ class CheckProfileStatusView(APIView):
         
         if not profile_fields['first_name'] or not profile_fields['last_name']:
             next_steps.append("Add your full name")
-        
-        if not profile_fields['job_title']:
-            next_steps.append("Add your job title")
         
         if not profile_fields['bio']:
             next_steps.append("Write a professional bio")
