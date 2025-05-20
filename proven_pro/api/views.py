@@ -21,6 +21,8 @@ import logging
 import random
 from django.db.models import Q
 from django.http import JsonResponse
+from django.template.loader import render_to_string
+from django.core.mail import EmailMessage
 
 Users = get_user_model()
 
@@ -173,49 +175,30 @@ def generate_profile_share(request):
     # Send email with share link
     verification_url = f"{settings.FRONTEND_URL}/verify-profile/{share_token}"
     
-    # HTML email content
-    html_message = f"""
-    <html>
-        <body>
-            <h2>Profile Review Request</h2>
-            <p>Hello,</p>
-            <p>You've been invited to review {user.name}'s professional profile.</p>
-            <p><a href="{verification_url}">Click here to view and leave a review</a></p>
-            <p>Or copy and paste this link in your browser:</p>
-            <p>{verification_url}</p>
-            <p>Note: This link will expire in 7 days.</p>
-            <br>
-            <p>Best regards,<br>The Team</p>
-        </body>
-    </html>
-    """
-    
-    # Plain text email content
-    text_message = f"""
-    Profile Review Request
-
-    Hello,
-
-    You've been invited to review {user.name}'s professional profile.
-
-    Please visit this link to view and leave a review:
-    {verification_url}
-
-    Note: This link will expire in 7 days.
-
-    Best regards,
-    The Team
-    """
-    
     try:
+        # Context for the template
+        context = {
+            'user_name': user.name,
+            'verification_url': verification_url
+        }
+        
+        # Render HTML content from template
+        html_content = render_to_string('emails/profile_share.html', context)
+        
+        # Create a simple text version from the HTML for email clients that don't support HTML
+        # This is automatically handled by EmailMessage
+        
         subject = f"Profile Review Request from {user.name}"
-        email = EmailMultiAlternatives(
+        from_email = settings.EMAIL_HOST_USER
+        
+        # Send email with HTML content
+        email = EmailMessage(
             subject=subject,
-            body=text_message,
-            from_email=settings.EMAIL_HOST_USER,
+            body=html_content,
+            from_email=from_email,
             to=[recipient_email],
         )
-        email.attach_alternative(html_message, "text/html")
+        email.content_subtype = "html"  # Set the primary content to be HTML
         email.send(fail_silently=False)
         
         return Response({
@@ -234,8 +217,7 @@ def generate_profile_share(request):
             'message': 'Share link created but email sending failed. Please share the link manually.',
             'share_token': share_token,
             'verification_url': verification_url
-        }, status=status.HTTP_201_CREATED)
-        
+        }, status=status.HTTP_201_CREATED)        
     except UserProfileSerializer.DoesNotExist:
         return Response(
             {'error': 'Profile not found'},
