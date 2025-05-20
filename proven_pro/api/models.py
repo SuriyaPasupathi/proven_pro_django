@@ -16,6 +16,8 @@ from django.core.cache import cache
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    is_verified = models.BooleanField(default=False)
+    otp = models.CharField(max_length=6, blank=True, null=True)
     google_id = models.CharField(max_length=255, null=True, blank=True)
     is_google_user = models.BooleanField(default=False)
     reset_token = models.CharField(max_length=255, null=True, blank=True)
