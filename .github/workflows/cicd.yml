@@ -1,160 +1,160 @@
-name: Django CI/CD
+# name: Django CI/CD
 
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
+# on:
+#   push:
+#     branches: [ main, develop ]
+#   pull_request:
+#     branches: [ main, develop ]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: test_db
-          MYSQL_USER: test_user
-          MYSQL_PASSWORD: test_password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+#     services:
+#       mysql:
+#         image: mysql:8.0
+#         env:
+#           MYSQL_ROOT_PASSWORD: root
+#           MYSQL_DATABASE: test_db
+#           MYSQL_USER: test_user
+#           MYSQL_PASSWORD: test_password
+#         ports:
+#           - 3306:3306
+#         options: >-
+#           --health-cmd="mysqladmin ping --silent"
+#           --health-interval=10s
+#           --health-timeout=5s
+#           --health-retries=5
 
-    env:
-      DB_ENGINE: django.db.backends.mysql
-      DB_NAME: test_db
-      DB_USER: test_user
-      DB_PASSWORD: test_password
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
+#     env:
+#       DB_ENGINE: django.db.backends.mysql
+#       DB_NAME: test_db
+#       DB_USER: test_user
+#       DB_PASSWORD: test_password
+#       DB_HOST: 127.0.0.1
+#       DB_PORT: 3306
 
-      # Email secrets
-      EMAIL_BACKEND: ${{ secrets.EMAIL_BACKEND }}
-      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-      EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
-      EMAIL_USE_TLS: ${{ secrets.EMAIL_USE_TLS }}
-      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
-      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
-      DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
-      EMAIL_TIMEOUT: ${{ secrets.EMAIL_TIMEOUT }}
+#       # Email secrets
+#       EMAIL_BACKEND: ${{ secrets.EMAIL_BACKEND }}
+#       EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+#       EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+#       EMAIL_USE_TLS: ${{ secrets.EMAIL_USE_TLS }}
+#       EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+#       EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+#       DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+#       EMAIL_TIMEOUT: ${{ secrets.EMAIL_TIMEOUT }}
 
-      # Stripe secrets
-      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+#       # Stripe secrets
+#       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+#       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+#       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+#       - name: Set up Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.10'
 
-      - name: Install dependencies
-        working-directory: ./core
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+#       - name: Install dependencies
+#         working-directory: ./core
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install -r requirements.txt
 
-      - name: Wait for MySQL to be ready
-        run: |
-          sudo apt-get install -y mysql-client
-          until mysqladmin ping -h 127.0.0.1 --silent; do
-            echo "Waiting for database..."
-            sleep 3
-          done
+#       - name: Wait for MySQL to be ready
+#         run: |
+#           sudo apt-get install -y mysql-client
+#           until mysqladmin ping -h 127.0.0.1 --silent; do
+#             echo "Waiting for database..."
+#             sleep 3
+#           done
 
-      - name: Setup Database
-        run: |
-          mysql -h 127.0.0.1 -u test_user -ptest_password -e "
-          DROP DATABASE IF EXISTS test_db;
-          CREATE DATABASE test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-          "
+#       - name: Setup Database
+#         run: |
+#           mysql -h 127.0.0.1 -u test_user -ptest_password -e "
+#           DROP DATABASE IF EXISTS test_db;
+#           CREATE DATABASE test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+#           "
 
-      - name: Make migrations
-        working-directory: ./core
-        run: |
-          python manage.py makemigrations user
-          python manage.py makemigrations
+#       - name: Make migrations
+#         working-directory: ./core
+#         run: |
+#           python manage.py makemigrations user
+#           python manage.py makemigrations
 
-      - name: Run migrations
-        working-directory: ./core
-        run: |
-          python manage.py migrate 
+#       - name: Run migrations
+#         working-directory: ./core
+#         run: |
+#           python manage.py migrate 
 
-      - name: Run Tests
-        working-directory: ./core
-        run: |
-          python manage.py test
+#       - name: Run Tests
+#         working-directory: ./core
+#         run: |
+#           python manage.py test
 
-  deploy:
-    if: github.ref == 'refs/heads/develop'
-    needs: build
-    runs-on: ubuntu-latest
+#   deploy:
+#     if: github.ref == 'refs/heads/develop'
+#     needs: build
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Deploy to EC2 (Develop Branch)
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -x
+#     steps:
+#       - name: Deploy to EC2 (Develop Branch)
+#         uses: appleboy/ssh-action@master
+#         with:
+#           host: ${{ secrets.EC2_HOST }}
+#           username: ${{ secrets.EC2_USER }}
+#           key: ${{ secrets.EC2_SSH_KEY }}
+#           script: |
+#             set -x
 
-            REPO_DIR="/home/ubuntu/suri/proven_pro_backend"
-            REPO_URL="https://github.com/SuriyaPasupathi/proven_pro_backend.git"
+#             REPO_DIR="/home/ubuntu/suri/proven_pro_backend"
+#             REPO_URL="https://github.com/SuriyaPasupathi/proven_pro_backend.git"
 
-            echo "Navigating to home directory"
-            cd /home/ubuntu
+#             echo "Navigating to home directory"
+#             cd /home/ubuntu
 
-            if [ ! -d "$REPO_DIR" ]; then
-              echo "Cloning repository (develop branch)..."
-              git clone -b develop $REPO_URL "$REPO_DIR"
-            else
-              echo "Repository exists. Pulling latest changes..."
-              cd "$REPO_DIR"
-              git checkout develop
-              git pull origin develop
-            fi
+#             if [ ! -d "$REPO_DIR" ]; then
+#               echo "Cloning repository (develop branch)..."
+#               git clone -b develop $REPO_URL "$REPO_DIR"
+#             else
+#               echo "Repository exists. Pulling latest changes..."
+#               cd "$REPO_DIR"
+#               git checkout develop
+#               git pull origin develop
+#             fi
 
-            echo "Setting up environment"
-            cd "$REPO_DIR"
-            source env/bin/activate || python3 -m venv env && source env/bin/activate
-            pip install --upgrade pip
+#             echo "Setting up environment"
+#             cd "$REPO_DIR"
+#             source env/bin/activate || python3 -m venv env && source env/bin/activate
+#             pip install --upgrade pip
 
-            cd core/
-            pip install -r requirements.txt
+#             cd core/
+#             pip install -r requirements.txt
 
-            echo "Step 1: Make migrations for all apps"
+#             echo "Step 1: Make migrations for all apps"
 
-            python manage.py makemigrations
-            python manage.py makemigrations api
+#             python manage.py makemigrations
+#             python manage.py makemigrations api
 
-            echo "Step 2: Migrate the user app first (important if using CustomUser)"
-            python manage.py migrate
-            python manage.py migrate api
+#             echo "Step 2: Migrate the user app first (important if using CustomUser)"
+#             python manage.py migrate
+#             python manage.py migrate api
             
-            echo "Apply remaining migrations (any leftover apps)"
-            python manage.py migrate
+#             echo "Apply remaining migrations (any leftover apps)"
+#             python manage.py migrate
 
-            # echo "pytest"
-            # python manage.py test
-            # echo "test complited"
+#             # echo "pytest"
+#             # python manage.py test
+#             # echo "test complited"
 
-            echo "Restarting Gunicorn and Nginx"
-            sudo systemctl restart gunicorn
-            sudo systemctl restart nginx
+#             echo "Restarting Gunicorn and Nginx"
+#             sudo systemctl restart gunicorn
+#             sudo systemctl restart nginx
 
-            echo "Reloading pm2 apps (if configured)"
-            pm2 reload all || echo "pm2 not configured"
+#             echo "Reloading pm2 apps (if configured)"
+#             pm2 reload all || echo "pm2 not configured"
 
-            echo "Deployment complete"
+#             echo "Deployment complete"
