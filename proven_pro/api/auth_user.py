@@ -283,8 +283,6 @@ class RegisterView(APIView):
             import traceback
             print(traceback.format_exc())
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-
 # Login View (Custom response with tokens)
 
 class LoginView(APIView):
