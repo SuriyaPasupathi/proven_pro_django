@@ -414,11 +414,6 @@ class LoginView(APIView):
 #password reset
 class RequestResetPasswordView(APIView):
     def post(self, request):
-        # Import necessary modules
-        import re  # Add this import
-        import logging
-        from django.core.mail import EmailMultiAlternatives
-        
         serializer = RequestPasswordResetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
@@ -428,47 +423,18 @@ class RequestResetPasswordView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
 
-            reset_link = f"{settings.FRONTEND_URL}/ResetPassword?uid={uid}&token={token}"
+            reset_link = f"{settings.FRONTEND_URL}/set-password?uid={uid}&token={token}"
 
-            # HTML email content
-            html_message = f"""
-            <html>
-                <body>
-                    <h2>Password Reset Request</h2>
-                    <p>Hello,</p>
-                    <p>You've requested to reset your password. Click the link below to reset it:</p>
-                    <p><a href="{reset_link}">Reset Your Password</a></p>
-                    <p>Or copy and paste this link in your browser:</p>
-                    <p>{reset_link}</p>
-                    <p>If you didn't request this, please ignore this email.</p>
-                    <p>This link will expire soon for security reasons.</p>
-                    <br>
-                    <p>Best regards,<br>The Team</p>
-                </body>
-            </html>
-            """
-
-            # Plain text version
-            text_message = f"""
-            Password Reset Request
-
-            Hello,
-
-            You've requested to reset your password. Please visit this link to reset it:
-            {reset_link}
-
-            If you didn't request this, please ignore this email.
-            This link will expire soon for security reasons.
-
-            Best regards,
-            The Team
-            """
+            # Render HTML email content from template
+            html_message = render_to_string('emails/password_reset_email.html', {
+                'reset_link': reset_link
+            })
 
             try:
                 subject = "Reset Your Password"
                 email_message = EmailMultiAlternatives(
                     subject=subject,
-                    body=text_message,
+                    body='',  # No plain text version
                     from_email=settings.EMAIL_HOST_USER,
                     to=[email],
                 )
@@ -490,8 +456,6 @@ class RequestResetPasswordView(APIView):
 
         except User.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
-
 class PasswordResetConfirmView(APIView):
     """
     Confirm password reset with token and set new password
