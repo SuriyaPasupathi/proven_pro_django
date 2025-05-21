@@ -411,7 +411,7 @@ class LoginView(APIView):
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-
+#password reset
 class RequestResetPasswordView(APIView):
     def post(self, request):
         # Import necessary modules
