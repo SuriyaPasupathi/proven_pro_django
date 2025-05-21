@@ -73,12 +73,6 @@ class ExperienceSerializer(serializers.ModelSerializer):
 
 
 class CertificationSerializer(serializers.ModelSerializer):
-    certifications_image_url = serializers.SerializerMethodField(read_only=True)
-    
-    def get_certifications_image_url(self, obj):
-        if obj.certifications_image:
-            return obj.certifications_image.url
-        return None
     
     class Meta:
         model = Certification
@@ -95,12 +89,7 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    project_image_url = serializers.SerializerMethodField(read_only=True)
-    
-    def get_project_image_url(self, obj):
-        if obj.project_image:
-            return obj.project_image.url
-        return None
+
     
     class Meta:
         model = Project
