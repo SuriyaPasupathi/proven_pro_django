@@ -145,8 +145,8 @@ class Certification(models.Model):
         return f"{self.certifications_name} - {self.user.username}"
 
 
-class ServiceCategory(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='service_categories')
+class Services(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='services')
     services_categories = models.CharField(max_length=100)
     services_description = models.TextField(blank=True)
     rate_range = models.CharField(max_length=50, blank=True)
@@ -157,7 +157,7 @@ class ServiceCategory(models.Model):
 
 
 class Portfolio(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='portfolios')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='portfolio')
     project_title = models.CharField(max_length=150)
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
