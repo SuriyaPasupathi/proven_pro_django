@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.contrib import messages
-from .models import Users, ProfileShare, Review
+from .models import Users, PendingUsers, ProfileShare, Review
+from django.db import models
+from django.db.models import Q
+
 
 class UsersAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'subscription_type', 'verification_status_display')
@@ -51,91 +54,82 @@ class UsersAdmin(admin.ModelAdmin):
     def approve_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.gov_id_document:
+            if user.gov_id_document and not user.gov_id_verified:
                 user.gov_id_verified = True
                 user.save()
+                user.send_verification_status_email('gov_id', True)
                 updated += 1
-        
-        if updated:
-            self.message_user(
-                request, 
-                f"Successfully approved government ID for {updated} user(s). Verification status updated.",
-                messages.SUCCESS
-            )
-        else:
-            self.message_user(
-                request,
-                "No users with government ID documents were found.",
-                messages.WARNING
-            )
-    approve_gov_id.short_description = "Approve Government ID"
-    
+        self._notify_result(request, updated, "approved", "government ID")
+
     def approve_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.address_document:
+            if user.address_document and not user.address_verified:
                 user.address_verified = True
                 user.save()
+                user.send_verification_status_email('address', True)
                 updated += 1
-        
-        if updated:
-            self.message_user(
-                request, 
-                f"Successfully approved address proof for {updated} user(s). Verification status updated.",
-                messages.SUCCESS
-            )
-        else:
-            self.message_user(
-                request,
-                "No users with address proof documents were found.",
-                messages.WARNING
-            )
-    approve_address_proof.short_description = "Approve Address Proof"
-    
+        self._notify_result(request, updated, "approved", "address proof")
+
     def reject_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
             if user.gov_id_verified:
                 user.gov_id_verified = False
                 user.save()
+                user.send_verification_status_email('gov_id', False)
                 updated += 1
-        
-        if updated:
-            self.message_user(
-                request, 
-                f"Successfully rejected government ID for {updated} user(s). Verification status updated.",
-                messages.SUCCESS
-            )
-        else:
-            self.message_user(
-                request,
-                "No users with verified government ID were found.",
-                messages.WARNING
-            )
-    reject_gov_id.short_description = "Reject Government ID"
-    
+        self._notify_result(request, updated, "rejected", "government ID")
+
     def reject_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
             if user.address_verified:
                 user.address_verified = False
                 user.save()
+                user.send_verification_status_email('address', False)
                 updated += 1
-        
+        self._notify_result(request, updated, "rejected", "address proof")
+
+    def _notify_result(self, request, updated, action, doc_type):
         if updated:
             self.message_user(
-                request, 
-                f"Successfully rejected address proof for {updated} user(s). Verification status updated.",
+                request,
+                f"Successfully {action} {doc_type} for {updated} user(s). Verification status updated.",
                 messages.SUCCESS
             )
         else:
             self.message_user(
                 request,
-                "No users with verified address proof were found.",
+                f"No users with {doc_type} matching criteria were found.",
                 messages.WARNING
             )
-    reject_address_proof.short_description = "Reject Address Proof"
 
 admin.site.register(Users, UsersAdmin)
+
+
+class PendingUsersAdmin(admin.ModelAdmin):
+    list_display = ('email', 'first_name', 'last_name', 'pending_percentage_display')
+    search_fields = ('email', 'first_name', 'last_name')
+    list_filter = ('subscription_type',)
+    readonly_fields = ('verification_percentage',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Include users with any pending verification (i.e. verification < 100%)
+        return qs.filter(
+            models.Q(verification_percentage__lt=100)
+        )
+
+    def pending_percentage_display(self, obj):
+        pending = 100 - obj.verification_status
+        color = 'orange' if pending > 0 else 'green'
+        return format_html('<span style="color: {};">{}%</span>', color, pending)
+
+    pending_percentage_display.short_description = 'Pending %'
+
+admin.site.register(PendingUsers, PendingUsersAdmin)
+
+# Register other models
 admin.site.register(ProfileShare)
 admin.site.register(Review)

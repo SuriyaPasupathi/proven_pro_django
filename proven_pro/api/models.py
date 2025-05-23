@@ -12,6 +12,22 @@ from django.db.models import Avg
 from django.core.cache import cache
 
 
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils import timezone
+from django.conf import settings
+from django.core.mail import send_mail
+from django.core.cache import cache
+import uuid
+
+import uuid
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.core.cache import cache
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
+
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -38,7 +54,6 @@ class Users(AbstractUser):
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
-   
 
     primary_tools = models.TextField(max_length=100, blank=True)
     technical_skills = models.TextField(max_length=100, blank=True)
@@ -78,6 +93,7 @@ class Users(AbstractUser):
         super().save(*args, **kwargs)
 
     def generate_share_link(self, recipient_email, expires_in_days=7):
+        from your_app.models import ProfileShare  # Make sure to import your actual app name
         share = ProfileShare.objects.create(
             user=self,
             recipient_email=recipient_email,
@@ -94,16 +110,17 @@ class Users(AbstractUser):
         document_name = "Government ID" if document_type == "gov_id" else "Address Proof"
         subject = f"Your {document_name} verification {status}"
         message = f"""
-        Hello {self.name},
+Hello {self.name},
 
-        Your {document_name} has been {status} by our verification team.
+Your {document_name} has been {status} by our verification team.
 
-        Your current verification status is {self.verification_status}%.
-        Thank you for using our service.
+Your current verification status is {self.verification_status}%.
 
-        Best regards,
-        The Proven Pro Team
-        """
+Thank you for using our service.
+
+Best regards,
+The Proven Pro Team
+"""
         try:
             send_mail(subject, message, settings.EMAIL_HOST_USER, [self.email], fail_silently=False)
         except Exception as e:
@@ -118,13 +135,19 @@ class Users(AbstractUser):
             models.Index(fields=['profile_url']),
         ]
 
+# Proxy model for pending users
+class PendingUsers(Users):
+    class Meta:
+        proxy = True
+        verbose_name = 'Pending User'
+        verbose_name_plural = 'Pending Users'
 
 class Experience(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
     company_name = models.CharField(max_length=150)
     position = models.CharField(max_length=100)
     key_responsibilities = models.TextField(blank=True)
-    experience_start_date = models.DateField()
+    experience_start_date = models.DateField(null=True, blank=True)
     experience_end_date = models.DateField(null=True, blank=True)
 
 
