@@ -159,7 +159,7 @@ class UserProfileView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request):
+def put(self, request):
     user = request.user
     data = request.data.copy()
 
