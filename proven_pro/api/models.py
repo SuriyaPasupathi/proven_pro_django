@@ -120,12 +120,15 @@ class Users(AbstractUser):
 
 
 class Experience(models.Model):
-    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
-    company_name = models.CharField(max_length=150)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='experiences')
+    company_name = models.CharField(max_length=100)
     position = models.CharField(max_length=100)
     key_responsibilities = models.TextField(blank=True)
-    experience_start_date = models.DateField()
+    experience_start_date = models.DateField(null=True, blank=True)
     experience_end_date = models.DateField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.position} at {self.company_name} - {self.user.username}"
 
 
 class Certification(models.Model):
@@ -135,24 +138,36 @@ class Certification(models.Model):
     certifications_issued_date = models.DateField()
     certifications_expiration_date = models.DateField(null=True, blank=True)
     certifications_id = models.TextField(blank=True)
-    certifications_image =models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    certifications_image = models.ImageField(upload_to='certifications_images/', null=True, blank=True)
     certifications_image_url = models.URLField(blank=True, null=True)
+    
+    def __str__(self):
+        return f"{self.certifications_name} - {self.user.username}"
 
 
 class ServiceCategory(models.Model):
-    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='categories')
-    services_categories = models.TextField(blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='service_categories')
+    services_categories = models.CharField(max_length=100)
     services_description = models.TextField(blank=True)
-    rate_range = models.CharField(max_length=100, blank=True)
-    availability = models.TextField(blank=True)
+    rate_range = models.CharField(max_length=50, blank=True)
+    availability = models.CharField(max_length=50, blank=True)
+    
+    def __str__(self):
+        return f"{self.services_categories} - {self.user.username}"
 
 
-class Project(models.Model):
-    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
-    project_title = models.CharField(max_length=100)
+class Portfolio(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='portfolios')
+    project_title = models.CharField(max_length=150)
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
     project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.project_title} - {self.user.username}"
+    
+    class Meta:
+        db_table = 'api_portfolio'  # Specify the table name explicitly
 
 
 class SocialLink(models.Model):

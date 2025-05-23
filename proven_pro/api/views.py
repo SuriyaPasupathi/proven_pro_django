@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
+from .models import Users, Review, ProfileShare, Experience, Certification, ServiceCategory, Portfolio
 import json , os
 from .models import Review, ProfileShare
 from django.conf import settings
@@ -53,67 +54,258 @@ class UserProfileView(APIView):
 
     def post(self, request):
         user = request.user
-        # Handle file uploads and data separately to avoid pickling errors
-        data = {}
-        files = {}
+        data = request.data.copy()
         
-        # Safely extract data fields
-        for key in request.data:
-            if key in request.FILES:
-                files[key] = request.FILES[key]
-            else:
-                data[key] = request.data[key]
-        
-        # Print the data for debugging
+        # Print received data for debugging
         print("Received data:", data)
-        print("Received files:", files)
         
-        # Handle project_image_url and project_image specially
-        if 'project_image_url' in data:
-            # Remove project_image_url from data as it's not needed for saving
-            data.pop('project_image_url')
-        
-        # If project_image is a string but not a file, remove it
-        if 'project_image' in data and not isinstance(data['project_image'], (list, tuple)) and not data['project_image'].startswith('data:'):
+        # Handle portfolio/projects data
+        if 'portfolio' in data:
             try:
-                # Check if it's a JSON string
-                import json
-                json_data = json.loads(data['project_image'])
-                # If it's an empty object or list, remove it
-                if not json_data or (isinstance(json_data, list) and len(json_data) == 0):
-                    data.pop('project_image')
-            except:
-                # If it's not valid JSON, keep it (might be a file path)
-                pass
+                # Parse portfolio data
+                portfolio_data = data.pop('portfolio')
+                if isinstance(portfolio_data, str):
+                    try:
+                        # Try to parse as JSON
+                        portfolio_items = json.loads(portfolio_data)
+                    except json.JSONDecodeError:
+                        # If it's not valid JSON, treat it as a list with one item
+                        portfolio_items = [portfolio_data]
+                else:
+                    portfolio_items = portfolio_data
+                
+                print("Portfolio items:", portfolio_items)
+                
+                # Clear existing portfolios
+                user.portfolios.all().delete()
+                
+                # Create new portfolios
+                if isinstance(portfolio_items, list):
+                    for item in portfolio_items:
+                        # If item is a string that looks like JSON, parse it
+                        if isinstance(item, str) and item.startswith('[') and item.endswith(']'):
+                            try:
+                                items = json.loads(item)
+                                for sub_item in items:
+                                    if isinstance(sub_item, dict):
+                                        portfolio_data = {
+                                            'project_title': sub_item.get('project_title', ''),
+                                            'project_description': sub_item.get('project_description', ''),
+                                            'project_url': sub_item.get('project_url', '')
+                                        }
+                                        
+                                        # Create the portfolio
+                                        portfolio = Portfolio.objects.create(user=user, **portfolio_data)
+                                        
+                                        # Handle project image if it exists
+                                        if 'project_image' in request.FILES:
+                                            portfolio.project_image = request.FILES['project_image']
+                                            portfolio.save()
+                                            
+                                        print(f"Created portfolio: {portfolio.project_title}")
+                            except json.JSONDecodeError:
+                                print(f"Error parsing portfolio item: {item}")
+                        elif isinstance(item, dict):
+                            portfolio_data = {
+                                'project_title': item.get('project_title', ''),
+                                'project_description': item.get('project_description', ''),
+                                'project_url': item.get('project_url', '')
+                            }
+                            
+                            # Create the portfolio
+                            portfolio = Portfolio.objects.create(user=user, **portfolio_data)
+                            
+                            # Handle project image if it exists
+                            if 'project_image' in request.FILES:
+                                portfolio.project_image = request.FILES['project_image']
+                                portfolio.save()
+                                
+                            print(f"Created portfolio: {portfolio.project_title}")
+            except Exception as e:
+                print(f"Error processing portfolio data: {e}")
+                import traceback
+                traceback.print_exc()
         
-        # Remove project_image if it's a string representation of an empty array or object
-        if 'project_image' in data and isinstance(data['project_image'], str):
-            if data['project_image'] in ['[]', '{}', '[{}]']:
-                data.pop('project_image')
+        # Handle individual project data if not using portfolio
+        elif 'project_title' in data:
+            try:
+                # Clear existing portfolios
+                user.portfolios.all().delete()
+                
+                # Get project data
+                portfolio_data = {
+                    'project_title': data.pop('project_title', ''),
+                    'project_description': data.pop('project_description', ''),
+                    'project_url': data.pop('project_url', '')
+                }
+                
+                # Create the portfolio
+                portfolio = Portfolio.objects.create(user=user, **portfolio_data)
+                
+                # Handle project image if it exists
+                if 'project_image' in request.FILES:
+                    portfolio.project_image = request.FILES['project_image']
+                    portfolio.save()
+                    
+                print(f"Created portfolio: {portfolio.project_title}")
+            except Exception as e:
+                print(f"Error creating portfolio: {e}")
+                import traceback
+                traceback.print_exc()
         
-        # Create a serializer with both data and files
-        serializer = UserProfileSerializer(user, data=data, partial=True)
+        # Handle services_categories separately
+        if 'services_categories' in data:
+            services_categories = data.pop('services_categories')
+            print("Services categories (raw):", services_categories)
+            
+            # Try to parse if it's a string
+            if isinstance(services_categories, str):
+                try:
+                    if services_categories.startswith('[') and services_categories.endswith(']'):
+                        services_categories = json.loads(services_categories)
+                    else:
+                        services_categories = [services_categories]
+                except Exception as e:
+                    print(f"Error parsing services_categories: {e}")
+                    services_categories = [services_categories]
+            
+            # Ensure it's a list
+            if not isinstance(services_categories, list):
+                services_categories = [services_categories]
+            
+            print("Services categories (processed):", services_categories)
+            
+            # Get related fields
+            services_description = data.get('services_description', '')
+            rate_range = data.get('rate_range', '')
+            availability = data.get('availability', '')
+            
+            # Clear existing service categories
+            user.service_categories.all().delete()
+            
+            # Create new service categories
+            for category in services_categories:
+                ServiceCategory.objects.create(
+                    user=user,
+                    services_categories=category,
+                    services_description=services_description,
+                    rate_range=rate_range,
+                    availability=availability
+                )
+        
+        # Handle experience data
+        if 'company_name' in data:
+            try:
+                # Clear existing experiences
+                user.experiences.all().delete()
+                
+                # Get experience data
+                experience_data = {
+                    'company_name': data.pop('company_name', ''),
+                    'position': data.pop('position', ''),
+                    'key_responsibilities': data.pop('key_responsibilities', ''),
+                    'experience_start_date': data.pop('experience_start_date', None),
+                    'experience_end_date': data.pop('experience_end_date', None)
+                }
+                
+                # Create new experience
+                Experience.objects.create(user=user, **experience_data)
+                print("Created experience successfully")
+            except Exception as e:
+                print(f"Error creating experience: {e}")
+        
+        # Handle certification data
+        if 'certification' in data:
+            try:
+                # Parse certification data
+                certification_data = data.pop('certification')
+                if isinstance(certification_data, str):
+                    try:
+                        # Try to parse as JSON
+                        certification_items = json.loads(certification_data)
+                    except json.JSONDecodeError:
+                        # If it's not valid JSON, treat it as a single item
+                        certification_items = [{'certifications_name': certification_data}]
+                else:
+                    certification_items = certification_data
+                
+                print("Certification items:", certification_items)
+                
+                # Clear existing certifications
+                user.certifications.all().delete()
+                
+                # Create new certifications
+                if isinstance(certification_items, list):
+                    for item in certification_items:
+                        # If item is a string that looks like JSON, parse it
+                        if isinstance(item, str) and item.startswith('[') and item.endswith(']'):
+                            try:
+                                items = json.loads(item)
+                                for sub_item in items:
+                                    if isinstance(sub_item, dict):
+                                        cert_data = {
+                                            'certifications_name': sub_item.get('certifications_name', ''),
+                                            'certifications_issuer': sub_item.get('certifications_issuer', ''),
+                                            'certifications_issued_date': sub_item.get('certifications_issued_date', timezone.now().date()),
+                                            'certifications_expiration_date': sub_item.get('certifications_expiration_date'),
+                                            'certifications_id': sub_item.get('certifications_id', '')
+                                        }
+                                        
+                                        # Create the certification
+                                        cert = Certification.objects.create(user=user, **cert_data)
+                                        
+                                        # Handle certification image if it exists
+                                        if 'certifications_image' in request.FILES:
+                                            cert.certifications_image = request.FILES['certifications_image']
+                                            cert.save()
+                                            
+                                        print(f"Created certification: {cert.certifications_name}")
+                            except json.JSONDecodeError:
+                                print(f"Error parsing certification item: {item}")
+                        elif isinstance(item, dict):
+                            cert_data = {
+                                'certifications_name': item.get('certifications_name', ''),
+                                'certifications_issuer': item.get('certifications_issuer', ''),
+                                'certifications_issued_date': item.get('certifications_issued_date', timezone.now().date()),
+                                'certifications_expiration_date': item.get('certifications_expiration_date'),
+                                'certifications_id': item.get('certifications_id', '')
+                            }
+                            
+                            # Create the certification
+                            cert = Certification.objects.create(user=user, **cert_data)
+                            
+                            # Handle certification image if it exists
+                            if 'certifications_image' in request.FILES:
+                                cert.certifications_image = request.FILES['certifications_image']
+                                cert.save()
+                                
+                            print(f"Created certification: {cert.certifications_name}")
+            except Exception as e:
+                print(f"Error processing certification data: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Create a serializer with the remaining data
+        serializer = UserProfileSerializer(
+            user,
+            data=data,
+            partial=True,
+            context={'request': request}
+        )
         
         if serializer.is_valid():
-            # Save the data fields
             instance = serializer.save()
             
-            # Handle file fields separately
-            for key, file in files.items():
-                setattr(instance, key, file)
-            
-            # Save again if there were files
-            if files:
-                instance.save()
-            
+            # Return updated user data
+            updated_serializer = UserProfileSerializer(instance, context={'request': request})
             return Response({
                 'message': 'Profile updated successfully',
-                'data': serializer.data
+                'data': updated_serializer.data
             }, status=status.HTTP_200_OK)
         else:
             print("Serializer errors:", serializer.errors)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     def put(self, request):
         user = request.user
