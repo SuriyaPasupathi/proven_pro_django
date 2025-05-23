@@ -159,49 +159,49 @@ class UserProfileView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-def put(self, request):
-    user = request.user
-    data = request.data.copy()
+    def put(self, request):
+        user = request.user
+        data = request.data.copy()
 
-    # Validate and update subscription_type
-    subscription_type = data.get('subscription_type')
-    if subscription_type:
-        if subscription_type not in ['free', 'standard', 'premium']:
-            return Response({
-                'error': 'Invalid subscription type'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        user.subscription_type = subscription_type
-        user.save()
-
-    # Update video intro
-    if 'video_intro' in request.FILES:
-        user.video_intro = request.FILES['video_intro']
-        user.save()
-        data.pop('video_intro', None)
-    elif 'video_intro_url' in data:
-        if not data['video_intro_url'].startswith('blob:'):
-            user.video_intro_url = data['video_intro_url']
+        # Validate and update subscription_type
+        subscription_type = data.get('subscription_type')
+        if subscription_type:
+            if subscription_type not in ['free', 'standard', 'premium']:
+                return Response({
+                    'error': 'Invalid subscription type'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            user.subscription_type = subscription_type
             user.save()
-        data.pop('video_intro_url', None)
 
-    # Update video description
-    if 'video_description' in data:
-        user.video_description = data['video_description']
-        user.save()
-        data.pop('video_description', None)
+        # Update video intro
+        if 'video_intro' in request.FILES:
+            user.video_intro = request.FILES['video_intro']
+            user.save()
+            data.pop('video_intro', None)
+        elif 'video_intro_url' in data:
+            if not data['video_intro_url'].startswith('blob:'):
+                user.video_intro_url = data['video_intro_url']
+                user.save()
+            data.pop('video_intro_url', None)
 
-    # You may choose to clear and update Services or Portfolios here if needed
+        # Update video description
+        if 'video_description' in data:
+            user.video_description = data['video_description']
+            user.save()
+            data.pop('video_description', None)
 
-    # Update remaining fields in the UserProfileSerializer
-    serializer = UserProfileSerializer(user, data=data, partial=True, context={'request': request})
-    if serializer.is_valid():
-        serializer.save()
-        return Response({
-            'message': 'Profile updated successfully',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
-    else:
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # You may choose to clear and update Services or Portfolios here if needed
+
+        # Update remaining fields in the UserProfileSerializer
+        serializer = UserProfileSerializer(user, data=data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Profile updated successfully',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  # Reuse post method for put requests
 
 class UserSearchFilterView(APIView):
