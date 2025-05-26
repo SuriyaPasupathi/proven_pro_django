@@ -152,7 +152,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if obj.profile_pic:
             return obj.profile_pic.url
         return None
-    
+     
     def get_video_intro_url(self, obj):
         if obj.video_intro:
             return obj.video_intro.url
