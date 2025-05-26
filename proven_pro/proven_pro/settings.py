@@ -67,8 +67,8 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Make sure this is before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
-    # Comment out or remove the CSRF middleware if you're using JWT for all API endpoints
-    # 'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.security.SecurityMiddleware',
+    # 'api.middleware.CustomMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

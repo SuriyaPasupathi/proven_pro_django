@@ -107,7 +107,7 @@ class UsersAdmin(admin.ModelAdmin):
 
 admin.site.register(Users, UsersAdmin)
 
-
+#pending status
 class PendingUsersAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'pending_percentage_display')
     search_fields = ('email', 'first_name', 'last_name')
