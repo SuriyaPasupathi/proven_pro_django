@@ -93,7 +93,7 @@ class Users(AbstractUser):
         super().save(*args, **kwargs)
 
     def generate_share_link(self, recipient_email, expires_in_days=7):
-        from your_app.models import ProfileShare  # Make sure to import your actual app name
+        from api.models import ProfileShare  # Make sure to import your actual app name
         share = ProfileShare.objects.create(
             user=self,
             recipient_email=recipient_email,
