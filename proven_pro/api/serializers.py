@@ -189,12 +189,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # Extract data before validation
         self.work_experiences_data = self.initial_data.get('work_experiences')
-        self.portfolio_data = self.initial_data.get('projects')
+        self.portfolio_data = self.initial_data.get('portfolio')
         self.certifications_data = self.initial_data.get('certifications')
         self.categories_data = self.initial_data.get('categories')
         self.social_links_data = self.initial_data.get('social_links')
 
-        
         # Store project images if they exist
         self.project_images = {}
         for key in self.initial_data:
@@ -234,12 +233,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         
         if portfolio_data:
             try:
+                print(f"Processing portfolio data: {portfolio_data}")
                 projects_list = json.loads(portfolio_data)
                 
                 if isinstance(projects_list, list):
                     for i, proj_data in enumerate(projects_list):
                         # Get the corresponding image if it exists
                         project_image = project_images.get(str(i))
+                        
+                        print(f"Creating project {i}: {proj_data}")
+                        print(f"With image: {project_image is not None}")
                         
                         # Create new project
                         Portfolio.objects.create(
@@ -251,6 +254,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
                         )
             except Exception as e:
                 print(f"Error processing portfolio: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
         
         # Process certification data
         certifications_name = validated_data.pop('certifications_name', None)
@@ -286,6 +291,28 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
                 # Log the error for debugging
                 logging.error(f"Error creating certification: {str(e)}")
+        
+        # Process service category data
+        services_categories = validated_data.pop('services_categories', None)
+        services_description = validated_data.pop('services_description', None)
+        rate_range = validated_data.pop('rate_range', None)
+        availability = validated_data.pop('availability', None)
+        
+        # If we have service category data, create a new service category
+        if services_categories or services_description or rate_range or availability:
+            try:
+                # Create new service category
+                service_category = ServiceCategory.objects.create(
+                    user=instance,
+                    services_categories=services_categories or '',
+                    services_description=services_description or '',
+                    rate_range=rate_range or '',
+                    availability=availability or ''
+                )
+                print(f"Created service category: {service_category.id}")
+            except Exception as e:
+                print(f"Error creating service category: {str(e)}")
+                logging.error(f"Error creating service category: {str(e)}")
         
         # Update the user instance with the remaining validated data
         for attr, value in validated_data.items():

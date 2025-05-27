@@ -11,7 +11,6 @@ from django.conf import settings
 from django.db.models import Avg
 from django.core.cache import cache
 
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
