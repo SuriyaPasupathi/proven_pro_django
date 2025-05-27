@@ -4,7 +4,9 @@ from django.contrib import messages
 from .models import Users, PendingUsers, ProfileShare, Review
 from django.db import models
 from django.db.models import Q
-
+from django import forms
+from django.utils.safestring import mark_safe
+from .models import dropdown
 
 class UsersAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'subscription_type', 'verification_status_display')
@@ -105,7 +107,12 @@ class UsersAdmin(admin.ModelAdmin):
                 messages.WARNING
             )
 
-admin.site.register(Users, UsersAdmin)
+class UserDetailsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'position', 'services_categories', 'rate_range', 'availability')
+    search_fields = ('user__email', 'position', 'services_categories')
+    list_filter = ('availability',)
+    fields = ('user', 'position', 'services_categories', 'rate_range', 'availability')
+    filter_horizontal = ('primary_tools', 'technical_skills', 'soft_skills')  # for better UI
 
 
 class PendingUsersAdmin(admin.ModelAdmin):
@@ -128,8 +135,86 @@ class PendingUsersAdmin(admin.ModelAdmin):
 
     pending_percentage_display.short_description = 'Pending %'
 
+admin.site.register(Users, UsersAdmin)  # Register the UsersAdmin class with the admin site
 admin.site.register(PendingUsers, PendingUsersAdmin)
-
-# Register other models
+ # Register the UserDetailsAdmin class with the admin site
 admin.site.register(ProfileShare)
 admin.site.register(Review)
+class DropdownAdminForm(forms.ModelForm):
+    class Meta:
+        model = dropdown
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tag_fields = ['primary_tools', 'technical_skills', 'soft_skills', 'services_categories', 'availability']
+        for field in tag_fields:
+            self.fields[field].widget = forms.TextInput(attrs={
+                'class': 'tagify-field',
+                'placeholder': 'Type and press Enter to add tags...'
+            })
+            
+    def clean(self):
+        cleaned_data = super().clean()
+        # Convert JSON-formatted tag data to simple comma-separated values
+        tag_fields = ['primary_tools', 'technical_skills', 'soft_skills', 'services_categories', 'availability']
+        for field in tag_fields:
+            if field in cleaned_data and cleaned_data[field]:
+                try:
+                    import json
+                    # Try to parse as JSON
+                    data = json.loads(cleaned_data[field])
+                    if isinstance(data, list):
+                        # Extract just the values
+                        values = [item.get('value', '') for item in data if 'value' in item]
+                        cleaned_data[field] = ', '.join(values)
+                except:
+                    # If not valid JSON, leave as is
+                    pass
+        return cleaned_data
+
+# Override the __str__ method for the dropdown model
+dropdown.__str__ = lambda self: "Dropdown Options"
+
+@admin.register(dropdown)
+class DropdownAdmin(admin.ModelAdmin):
+    form = DropdownAdminForm
+    list_display = ['id', 'get_primary_tools', 'get_technical_skills']
+
+    def get_primary_tools(self, obj):
+        return obj.primary_tools[:50] + "..." if len(obj.primary_tools) > 50 else obj.primary_tools
+    get_primary_tools.short_description = "Primary Tools"
+
+    def get_technical_skills(self, obj):
+        return obj.technical_skills[:50] + "..." if len(obj.technical_skills) > 50 else obj.technical_skills
+    get_technical_skills.short_description = "Technical Skills"
+
+    class Media:
+        css = {
+            'all': ('https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css',)
+        }
+        js = (
+            'https://cdn.jsdelivr.net/npm/@yaireo/tagify',  # Tagify library
+        )
+    
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # Add custom JavaScript to the page
+        js = '''
+        <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".tagify-field").forEach(function (input) {
+                new Tagify(input);
+            });
+        });
+        </script>
+        '''
+        # Inject the script into the admin page
+        request.tagify_init_js = js
+        return form
+    
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        # Add our custom JavaScript to the context
+        if hasattr(request, 'tagify_init_js'):
+            context['media'] = mark_safe(f'{context["media"]}\n{request.tagify_init_js}')
+        return super().render_change_form(request, context, add, change, form_url, obj)

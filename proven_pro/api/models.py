@@ -27,6 +27,8 @@ from django.core.cache import cache
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.auth import get_user_model
+
 
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -177,7 +179,25 @@ class Project(models.Model):
     project_url = models.URLField(blank=True)
     project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
 
+class dropdown(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
 
+    # Tools and Skills
+    primary_tools = models.TextField(max_length=100, blank=True)
+    technical_skills = models.TextField(max_length=100, blank=True)
+    soft_skills = models.TextField(blank=True)
+
+    # Experience
+    position = models.CharField(max_length=100, blank=True)
+
+    # Service Category
+    services_categories = models.TextField(blank=True)
+    rate_range = models.CharField(max_length=100, blank=True)
+    availability = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Details for {self.user.email}"
 class SocialLink(models.Model):
     PLATFORM_CHOICES = [
         ('linkedin', 'LinkedIn'),
