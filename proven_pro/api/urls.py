@@ -1,3 +1,4 @@
+
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -11,8 +12,7 @@ from .subscription import(
     UpdateSubscriptionView,CreateGCashPaymentView,VerifyPaymentView,PayMongoWebhookView,GCashWebhookView)
 
 from .views import ( 
-    UserProfileView,
-    profile_share_actions,
+    UserProfileView,    
     UploadVerificationDocumentView,
     RequestMobileVerificationView,
     VerifyMobileOTPView,
@@ -20,7 +20,11 @@ from .views import (
     admin_document_approval_webhook,
     UserSearchFilterView,
     health_check,
-    CheckProfileStatusView, 
+    CheckProfileStatusView,
+    profile_share_actions,
+    submit_profile_review,
+    
+
 )
 
 router = DefaultRouter()
@@ -42,6 +46,7 @@ urlpatterns = [
 
     #profile
     path('request-profile-share/', profile_share_actions, name='profile_share_actions'),
+    path('submit-profile-review/', submit_profile_review, name='submit-profile-review'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
@@ -54,7 +59,6 @@ urlpatterns = [
     path('verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
     path('paymongo-webhook/', PayMongoWebhookView.as_view(), name='paymongo-webhook'),
     path('subscription-check/', SubscriptionCheckView.as_view(), name='subscription-check'),
-   
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),
@@ -67,3 +71,4 @@ urlpatterns = [
 # Add this at the end to serve media files during development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

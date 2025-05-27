@@ -23,6 +23,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
+import logging
 
 Users = get_user_model()
 
@@ -53,7 +54,7 @@ class UserProfileView(APIView):
 
     def post(self, request):
         user = request.user
-        # Handle file uploads and data separately to avoid pickling errors
+        # Handle file uploads and data separately
         data = {}
         files = {}
         
@@ -66,54 +67,31 @@ class UserProfileView(APIView):
         
         # Print the data for debugging
         print("Received data:", data)
-        print("Received files:", files)
+        print("Received files keys:", files.keys())
         
-        # Handle project_image_url and project_image specially
-        if 'project_image_url' in data:
-            # Remove project_image_url from data as it's not needed for saving
-            data.pop('project_image_url')
+        # Pass both data and files to the serializer
+        serializer_data = data.copy()
         
-        # If project_image is a string but not a file, remove it
-        if 'project_image' in data and not isinstance(data['project_image'], (list, tuple)) and not data['project_image'].startswith('data:'):
-            try:
-                # Check if it's a JSON string
-                import json
-                json_data = json.loads(data['project_image'])
-                # If it's an empty object or list, remove it
-                if not json_data or (isinstance(json_data, list) and len(json_data) == 0):
-                    data.pop('project_image')
-            except:
-                # If it's not valid JSON, keep it (might be a file path)
-                pass
+        # Add file fields to serializer data
+        for key, value in files.items():
+            serializer_data[key] = value
         
-        # Remove project_image if it's a string representation of an empty array or object
-        if 'project_image' in data and isinstance(data['project_image'], str):
-            if data['project_image'] in ['[]', '{}', '[{}]']:
-                data.pop('project_image')
-        
-        # Create a serializer with both data and files
-        serializer = UserProfileSerializer(user, data=data, partial=True)
+        # Make sure work_experiences is properly passed to the serializer
+        serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
         
         if serializer.is_valid():
-            # Save the data fields
-            instance = serializer.save()
+            # Debug: Check validated data
+            print("Serializer validated_data:", serializer.validated_data)
             
-            # Handle file fields separately
-            for key, file in files.items():
-                setattr(instance, key, file)
-            
-            # Save again if there were files
-            if files:
-                instance.save()
-            
+            # Save and return response
+            serializer.save()
             return Response({
-                'message': 'Profile updated successfully',
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
+                "message": "Profile updated successfully",
+                "data": UserProfileSerializer(user).data
+            })
         else:
             print("Serializer errors:", serializer.errors)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
         user = request.user
@@ -165,15 +143,12 @@ class UserSearchFilterView(APIView):
         return Response(serializer.data)
 
 
-
-logger = logging.getLogger(__name__)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def profile_share_actions(request):
     action = request.query_params.get('action') if request.method == 'GET' else request.data.get('action')
 
-    # ✅ 1. Verify Profile via Share Token
+    # 1. Verify Profile via Share Token
     if request.method == 'GET' and action == 'verify':
         token = request.query_params.get('token')
         try:
@@ -192,7 +167,7 @@ def profile_share_actions(request):
         except (ProfileShare.DoesNotExist, ValueError, TypeError):
             return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
 
-    # ✅ 2. Generate Profile Share Link and Send Email
+    # 2. Generate Profile Share Link and Send Email
     if request.method == 'POST' and action == 'generate':
         user = request.user
         recipient_email = request.data.get('email')
@@ -234,43 +209,7 @@ def profile_share_actions(request):
                 'verification_url': verification_url
             }, status=status.HTTP_201_CREATED)
 
-    # ✅ 3. Submit a Review
-    if request.method == 'POST' and action == 'submit':
-        token = request.data.get('token')
-        try:
-            share = ProfileShare.objects.get(share_token=token)
-            if not share.is_valid():
-                return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
-
-            review_data = {
-                'user': share.user.id,
-                'reviewer_name': request.data.get('reviewer_name'),
-                'rating': request.data.get('rating'),
-                'comment': request.data.get('comment')
-            }
-
-            if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
-                return Response({
-                    'error': 'reviewer_name, rating, and comment are required fields'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            serializer = ReviewSerializer(data=review_data)
-            if serializer.is_valid():
-                review = serializer.save()
-                return Response({
-                    'message': 'Review submitted successfully',
-                    'review': ReviewSerializer(review).data
-                }, status=status.HTTP_201_CREATED)
-
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except ProfileShare.DoesNotExist:
-            return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error submitting review: {str(e)}")
-            return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    # ✅ 4. Get All Reviews for Current User
+    # 3. Get All Reviews for Current User
     if request.method == 'GET' and action == 'get_reviews':
         user = request.user
         reviews = Review.objects.filter(user=user).order_by('-created_at')
@@ -278,6 +217,46 @@ def profile_share_actions(request):
         return Response(serializer.data)
 
     return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Or use custom token-based auth if needed
+def submit_profile_review(request):
+    token = request.data.get('share_token')
+    try:
+        share = ProfileShare.objects.get(share_token=token)
+
+        if not share.is_valid():
+            return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        review_data = {
+            'user': share.user.id,
+            'reviewer_name': request.data.get('reviewer_name'),
+            'rating': request.data.get('rating'),
+            'comment': request.data.get('comment')
+        }
+
+        if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
+            return Response({
+                'error': 'reviewer_name, rating, and comment are required fields'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ReviewSerializer(data=review_data)
+        if serializer.is_valid():
+            review = serializer.save()
+            return Response({
+                'message': 'Review submitted successfully',
+                'review': ReviewSerializer(review).data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    except ProfileShare.DoesNotExist:
+        return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error submitting review: {str(e)}")
+        return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
 
 class CheckProfileStatusView(APIView):
     permission_classes = [IsAuthenticated]
@@ -337,7 +316,6 @@ class CheckProfileStatusView(APIView):
             next_steps.append("Add your skills")
         
         return next_steps
-
 class UploadVerificationDocumentView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -513,3 +491,4 @@ def admin_document_approval_webhook(request):
         return Response({
             'error': 'User not found'
         }, status=status.HTTP_404_NOT_FOUND)
+
