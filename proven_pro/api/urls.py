@@ -47,6 +47,7 @@ urlpatterns = [
     #profile
     path('request-profile-share/', profile_share_actions, name='profile_share_actions'),
     path('submit-profile-review/', submit_profile_review, name='submit-profile-review'),
+    
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
