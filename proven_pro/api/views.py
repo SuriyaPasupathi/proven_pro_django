@@ -201,7 +201,7 @@ def profile_share_actions(request):
             return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         share_token = user.generate_share_link(recipient_email)
-        verification_url = f"{settings.FRONTEND_URL}/verify-profile/{share_token}"
+        verification_url = f"{settings.FRONTEND_URL}/profile/{share_token}"
 
         try:
             context = {
