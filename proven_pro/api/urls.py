@@ -12,10 +12,7 @@ from .subscription import(
 
 from .views import ( 
     UserProfileView,
-    generate_profile_share,
-    verify_profile_share,
-    submit_review,
-    get_reviews,
+    profile_share_actions,
     UploadVerificationDocumentView,
     RequestMobileVerificationView,
     VerifyMobileOTPView,
@@ -44,10 +41,7 @@ urlpatterns = [
     path('', include(router.urls)),
 
     #profile
-    path('share-profile/', generate_profile_share, name='share-profile'),
-    path('verify-share/<uuid:token>/', verify_profile_share, name='verify-share'),
-    path('submit-review/<uuid:token>/', submit_review, name='submit-review'),
-    path('get_reviews/', get_reviews, name='get_reviews'),
+    path('reviews/', profile_share_actions, name='profile_share_actions'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
@@ -60,7 +54,7 @@ urlpatterns = [
     path('verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
     path('paymongo-webhook/', PayMongoWebhookView.as_view(), name='paymongo-webhook'),
     path('subscription-check/', SubscriptionCheckView.as_view(), name='subscription-check'),
-    path('profiles/<uuid:token>/', verify_profile_share, name='verify-share'),
+   
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),
