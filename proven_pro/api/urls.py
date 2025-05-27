@@ -41,7 +41,7 @@ urlpatterns = [
     path('', include(router.urls)),
 
     #profile
-    path('reviews/', profile_share_actions, name='profile_share_actions'),
+    path('request-profile-share/', profile_share_actions, name='profile_share_actions'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
