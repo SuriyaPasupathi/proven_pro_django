@@ -110,17 +110,17 @@ class Users(AbstractUser):
         document_name = "Government ID" if document_type == "gov_id" else "Address Proof"
         subject = f"Your {document_name} verification {status}"
         message = f"""
-Hello {self.name},
+        Hello {self.name},
 
-Your {document_name} has been {status} by our verification team.
+        Your {document_name} has been {status} by our verification team.
 
-Your current verification status is {self.verification_status}%.
+        Your current verification status is {self.verification_status}%.
 
-Thank you for using our service.
+            Thank you for using our service.
 
-Best regards,
-The Proven Pro Team
-"""
+            Best regards,
+            The Proven Pro Team
+            """
         try:
             send_mail(subject, message, settings.EMAIL_HOST_USER, [self.email], fail_silently=False)
         except Exception as e:
@@ -139,7 +139,7 @@ class PendingUsers(Users):
     class Meta:
         proxy = True
         verbose_name = 'Pending User'
-        verbose_name_plural = 'Pending Users'
+        verbose_name_plural = 'Pending Verify Users'
 
 class Experiences(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
