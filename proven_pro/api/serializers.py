@@ -57,37 +57,39 @@ class ReviewSerializer(serializers.ModelSerializer):
 class ExperienceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experience
-        fields = ('id', 'company_name', 'position', 'key_responsibilities', 'experience_start_date', 'experience_end_date')
+        fields = '__all__'
 
 
 class CertificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Certification
-        fields = (
-            'id', 'certifications_name', 'certifications_issuer', 'certifications_issued_date',
-            'certifications_expiration_date', 'certifications_id', 'certifications_image_url'
-        )
+        fields = '__all__'
 
 
 class ServicesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Services
-        fields = ('id', 'services_categories', 'services_description', 'rate_range', 'availability')
+        fields = '__all__'
 
 
 class PortfolioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Portfolio
-        fields = ('id', 'project_title', 'project_description', 'project_url')
+        fields = '__all__'
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    social_links = SocialLinkSerializer(many=True, read_only=True)
-    client_reviews = ReviewSerializer(many=True, read_only=True)
+    # Nested serializers for reading data
     experiences = ExperienceSerializer(many=True, read_only=True)
     certifications = CertificationSerializer(many=True, read_only=True)
     services = ServicesSerializer(many=True, read_only=True)
     portfolio = PortfolioSerializer(many=True, read_only=True)
+
+    # Write-only fields for creating/updating data
+    experience = serializers.DictField(write_only=True, required=False)
+    portfolio = serializers.DictField(write_only=True, required=False)
+    certification = serializers.DictField(write_only=True, required=False)
+    service = serializers.DictField(write_only=True, required=False)
 
     # Social links
     linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
@@ -153,106 +155,35 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
             'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
-            'mobile_verified', 'verification_status'
+            'mobile_verified', 'verification_status',
+            'experience', 'portfolio', 'certification', 'service'
         )
 
     def update(self, instance, validated_data):
-        # Handle social links
-        linkedin = validated_data.pop('linkedin', None)
-        facebook = validated_data.pop('facebook', None)
-        twitter = validated_data.pop('twitter', None)
+        # Handle experience data
+        if 'experience' in validated_data:
+            experience_data = validated_data.pop('experience')
+            Experience.objects.create(user=instance, **experience_data)
 
-        # Handle experience
-        company_name = validated_data.pop('company_name', None)
-        position = validated_data.pop('position', None)
-        experience_start_date = validated_data.pop('experience_start_date', None)
-        experience_end_date = validated_data.pop('experience_end_date', None)
-        key_responsibilities = validated_data.pop('key_responsibilities', None)
+        # Handle portfolio data
+        if 'portfolio' in validated_data:
+            portfolio_data = validated_data.pop('portfolio')
+            Portfolio.objects.create(user=instance, **portfolio_data)
 
-        # Handle portfolio
-        project_title = validated_data.pop('project_title', None)
-        project_description = validated_data.pop('project_description', None)
-        project_url = validated_data.pop('project_url', None)
-        project_image = validated_data.pop('project_image', None)
-        project_image_url = validated_data.pop('project_image_url', None)
+        # Handle certification data
+        if 'certification' in validated_data:
+            certification_data = validated_data.pop('certification')
+            Certification.objects.create(user=instance, **certification_data)
 
-        # Handle certification
-        certifications_name = validated_data.pop('certifications_name', None)
-        certifications_issuer = validated_data.pop('certifications_issuer', None)
-        certifications_issued_date = validated_data.pop('certifications_issued_date', None)
-        certifications_expiration_date = validated_data.pop('certifications_expiration_date', None)
-        certifications_id = validated_data.pop('certifications_id', None)
-        certifications_image = validated_data.pop('certifications_image', None)
-
-        # Handle service category
-        services_categories = validated_data.pop('services_categories', None)
-        services_description = validated_data.pop('services_description', None)
-        rate_range = validated_data.pop('rate_range', None)
-        availability = validated_data.pop('availability', None)
+        # Handle service data
+        if 'service' in validated_data:
+            service_data = validated_data.pop('service')
+            Services.objects.create(user=instance, **service_data)
 
         # Update basic user fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        # Update social links
-        if linkedin is not None:
-            SocialLink.objects.update_or_create(user=instance, platform='linkedin', defaults={'url': linkedin})
-        if facebook is not None:
-            SocialLink.objects.update_or_create(user=instance, platform='facebook', defaults={'url': facebook})
-        if twitter is not None:
-            SocialLink.objects.update_or_create(user=instance, platform='twitter', defaults={'url': twitter})
-
-        # Create experience if all required fields are present
-        if all([company_name, position, experience_start_date, experience_end_date]):
-            Experience.objects.create(
-                user=instance,
-                company_name=company_name,
-                position=position,
-                experience_start_date=experience_start_date,
-                experience_end_date=experience_end_date,
-                key_responsibilities=key_responsibilities or ''
-            )
-
-        # Create portfolio item if title is provided
-        if project_title:
-            portfolio_data = {
-                'user': instance,
-                'project_title': project_title,
-                'project_description': project_description or '',
-                'project_url': project_url or ''
-            }
-            
-            if project_image:
-                portfolio_data['project_image'] = project_image
-            
-            Portfolio.objects.create(**portfolio_data)
-
-        # Create certification if required fields are present
-        if certifications_name and certifications_issuer and certifications_issued_date:
-            certification_data = {
-                'user': instance,
-                'certifications_name': certifications_name,
-                'certifications_issuer': certifications_issuer,
-                'certifications_issued_date': certifications_issued_date,
-                'certifications_expiration_date': certifications_expiration_date,
-                'certifications_id': certifications_id or ''
-            }
-            
-            if certifications_image:
-                certification_data['certifications_image'] = certifications_image
-                
-            Certification.objects.create(**certification_data)
-
-        # Create service if any field is provided
-        if any([services_categories, services_description, rate_range, availability]):
-            Services.objects.create(
-                user=instance,
-                services_categories=services_categories or '',
-                services_description=services_description or '',
-                rate_range=rate_range or '',
-                availability=availability or ''
-            )
 
         return instance
 

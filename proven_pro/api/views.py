@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
-from .models import Users, Review, ProfileShare, Portfolio, Services
+from .models import Users, Review, ProfileShare, Portfolio, Services, Experience, Certification
 import json, os
 from django.conf import settings
 from django.utils import timezone
@@ -39,170 +39,137 @@ with open(json_file_path) as file:
     URL_FIELDS = profile_fields["URL_FIELDS"]
 
 class UserProfileView(APIView):
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
     permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get(self, request):
+        """Get user profile with all related data"""
         user = request.user
         serializer = UserProfileSerializer(user, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
+        """Create new profile items (experience, portfolio, certification, service)"""
         user = request.user
         data = request.data.copy()
 
-        # Handle subscription type update
-        if 'subscription_type' in data:
-            subscription_type = data['subscription_type']
-            if subscription_type not in ['free', 'standard', 'premium']:
-                return Response({
-                    'error': 'Invalid subscription type'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            user.subscription_type = subscription_type
-            user.save()
+        # Add required fields from existing user if not provided
+        if 'username' not in data:
+            data['username'] = user.username
+        if 'email' not in data:
+            data['email'] = user.email
 
-        # Handle video intro
-        if 'video_intro' in request.FILES:
-            user.video_intro = request.FILES['video_intro']
-            user.save()
-            # Remove from data to prevent serializer from trying to handle it
-            data.pop('video_intro', None)
-        elif 'video_intro_url' in data:
-            # If it's a blob URL, we'll ignore it as it's not a valid file
-            if data['video_intro_url'].startswith('blob:'):
-                data.pop('video_intro_url', None)
-            else:
-                user.video_intro_url = data['video_intro_url']
-                user.save()
-                data.pop('video_intro_url', None)
-
-        # Handle video description
-        if 'video_description' in data:
-            user.video_description = data['video_description']
-            user.save()
-            data.pop('video_description', None)
-
-        # Handle portfolio data
-        if 'portfolio' in data and isinstance(data['portfolio'], str):
-            try:
-                portfolio_data = json.loads(data['portfolio'])
-                if isinstance(portfolio_data, list):
-                    for item in portfolio_data:
-                        if 'project_title' in item:
-                            portfolio = Portfolio.objects.create(
-                                user=user,
-                                project_title=item['project_title'],
-                                project_description=item.get('project_description', ''),
-                                project_url=item.get('project_url', '')
-                            )
-                            if 'project_image' in item and item['project_image']:
-                                portfolio.project_image = item['project_image']
-                                portfolio.save()
-            except json.JSONDecodeError:
-                return Response({
-                    'error': 'Invalid portfolio data format'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Handle service categories
-        if 'services_categories' in data:
-            try:
-                services_data = json.loads(data['services_categories']) if isinstance(data['services_categories'], str) else data['services_categories']
-                
-                # Handle both list and single item formats
-                if isinstance(services_data, list):
-                    for item in services_data:
-                        if isinstance(item, dict):
-                            Services.objects.create(
-                                user=user,
-                                services_categories=item.get('services_categories', ''),
-                                services_description=item.get('services_description', ''),
-                                rate_range=item.get('rate_range', ''),
-                                availability=item.get('availability', '')
-                            )
-                        elif isinstance(item, str):
-                            Services.objects.create(
-                                user=user,
-                                services_categories=item,
-                                services_description='',
-                                rate_range='',
-                                availability=''
-                            )
-                elif isinstance(services_data, dict):
-                    Services.objects.create(
-                        user=user,
-                        services_categories=services_data.get('services_categories', ''),
-                        services_description=services_data.get('services_description', ''),
-                        rate_range=services_data.get('rate_range', ''),
-                        availability=services_data.get('availability', '')
-                    )
-                elif isinstance(services_data, str):
-                    Services.objects.create(
-                        user=user,
-                        services_categories=services_data,
-                        services_description='',
-                        rate_range='',
-                        availability=''
-                    )
-            except json.JSONDecodeError:
-                return Response({
-                    'error': 'Invalid services data format'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Update other profile data
+        # Validate the data
         serializer = UserProfileSerializer(user, data=data, partial=True, context={'request': request})
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Update user profile
             serializer.save()
+
+            # Handle experience if provided
+            if 'experience' in data:
+                Experience.objects.create(user=user, **data['experience'])
+
+            # Handle portfolio if provided
+            if 'portfolio' in data:
+                Portfolio.objects.create(user=user, **data['portfolio'])
+
+            # Handle certification if provided
+            if 'certification' in data:
+                Certification.objects.create(user=user, **data['certification'])
+
+            # Handle service if provided
+            if 'service' in data:
+                Services.objects.create(user=user, **data['service'])
+
+            # Get updated user data
+            updated_user = Users.objects.get(id=user.id)
+            response_serializer = UserProfileSerializer(updated_user, context={'request': request})
+            
             return Response({
                 'message': 'Profile updated successfully',
-                'data': serializer.data
+                'data': response_serializer.data
             }, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
+        """Update user profile and related items"""
         user = request.user
         data = request.data.copy()
 
-        # Validate and update subscription_type
-        subscription_type = data.get('subscription_type')
-        if subscription_type:
-            if subscription_type not in ['free', 'standard', 'premium']:
-                return Response({
-                    'error': 'Invalid subscription type'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            user.subscription_type = subscription_type
-            user.save()
+        # Add required fields from existing user if not provided
+        if 'username' not in data:
+            data['username'] = user.username
+        if 'email' not in data:
+            data['email'] = user.email
 
-        # Update video intro
-        if 'video_intro' in request.FILES:
-            user.video_intro = request.FILES['video_intro']
-            user.save()
-            data.pop('video_intro', None)
-        elif 'video_intro_url' in data:
-            if not data['video_intro_url'].startswith('blob:'):
-                user.video_intro_url = data['video_intro_url']
-                user.save()
-            data.pop('video_intro_url', None)
-
-        # Update video description
-        if 'video_description' in data:
-            user.video_description = data['video_description']
-            user.save()
-            data.pop('video_description', None)
-
-        # You may choose to clear and update Services or Portfolios here if needed
-
-        # Update remaining fields in the UserProfileSerializer
+        # Validate the data
         serializer = UserProfileSerializer(user, data=data, partial=True, context={'request': request})
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Update user profile
             serializer.save()
+
+            # Get updated user data
+            updated_user = Users.objects.get(id=user.id)
+            response_serializer = UserProfileSerializer(updated_user, context={'request': request})
+            
             return Response({
                 'message': 'Profile updated successfully',
-                'data': serializer.data
+                'data': response_serializer.data
             }, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- # Reuse post method for put requests
+
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, item_type=None, item_id=None):
+        """Delete specific items from user profile"""
+        user = request.user
+
+        if not item_type or not item_id:
+            return Response({
+                'error': 'Item type and ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Delete based on item type
+            if item_type == 'experience':
+                item = Experience.objects.filter(user=user, id=item_id).first()
+            elif item_type == 'portfolio':
+                item = Portfolio.objects.filter(user=user, id=item_id).first()
+            elif item_type == 'certification':
+                item = Certification.objects.filter(user=user, id=item_id).first()
+            elif item_type == 'service':
+                item = Services.objects.filter(user=user, id=item_id).first()
+            else:
+                return Response({
+                    'error': 'Invalid item type'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if item:
+                item.delete()
+                return Response({
+                    'message': f'{item_type.title()} deleted successfully'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'Item not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserSearchFilterView(APIView):
     permission_classes = [AllowAny]  # Change to IsAuthenticated if needed
