@@ -11,7 +11,6 @@ from django.conf import settings
 from django.db.models import Avg
 from django.core.cache import cache
 
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
@@ -92,7 +91,7 @@ class Users(AbstractUser):
             self.profile_url = str(uuid.uuid4())[:8]
         super().save(*args, **kwargs)
 
-    def generate_share_link(self, recipient_email, expires_in_days=7):
+    def generate_share_link(self, recipient_email, expires_in_days=1):
         from api.models import ProfileShare  # Make sure to import your actual app name
         share = ProfileShare.objects.create(
             user=self,
@@ -142,7 +141,7 @@ class PendingUsers(Users):
         verbose_name = 'Pending User'
         verbose_name_plural = 'Pending Users'
 
-class Experience(models.Model):
+class Experiences(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
     company_name = models.CharField(max_length=150)
     position = models.CharField(max_length=100)
@@ -170,7 +169,7 @@ class ServiceCategory(models.Model):
     availability = models.TextField(blank=True)
 
 
-class Project(models.Model):
+class Portfolio(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
     project_title = models.CharField(max_length=100)
     project_description = models.TextField(blank=True)
@@ -242,3 +241,5 @@ def handle_verification_status_change(sender, instance, **kwargs):
             instance.send_verification_status_email('gov_id', instance.gov_id_verified)
         if 'address_verified' in kwargs['update_fields']:
             instance.send_verification_status_email('address', instance.address_verified)
+
+
