@@ -19,6 +19,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from .models import Users
 import random
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 
@@ -494,10 +495,10 @@ class PasswordResetConfirmView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 class AccountSettingsView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         action = request.data.get('action')
-        
+
         if action == 'change_email_request':
             return self._handle_email_change_request(request)
         elif action == 'verify_email_otp':
@@ -506,98 +507,83 @@ class AccountSettingsView(APIView):
             return self._handle_password_change(request)
         else:
             return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def _handle_email_change_request(self, request):
         new_email = request.data.get('email')
-        
+        user = request.user
+
         if not new_email:
             return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        # Check if email is already in use
-        if Users.objects.filter(email=new_email).exclude(id=request.user.id).exists():
+
+        if Users.objects.filter(email=new_email).exclude(id=user.id).exists():
             return Response({'error': 'Email is already in use'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Generate OTP
+
+        # Generate and save OTP
         otp_code = str(random.randint(100000, 999999))
-        
-        # Store OTP and new email in session or cache
-        request.session['email_change_otp'] = otp_code
-        request.session['new_email'] = new_email
-        
+        user.otp = otp_code
+        user.temp_email = new_email
+        user.otp_created_at = timezone.now()
+        user.save()
+
         # Send OTP to new email
-        self._send_email_otp(new_email, otp_code, request.user)
-        
+        self._send_email_otp(new_email, otp_code, user)
+
         return Response({
             'message': 'Verification code sent to your new email address',
             'email': new_email
         })
-    
+
     def _handle_email_otp_verification(self, request):
-        otp = request.data.get('otp')
-        stored_otp = request.session.get('email_change_otp')
-        new_email = request.session.get('new_email')
-        
-        if not stored_otp or not new_email:
-            return Response({'error': 'No email change request in progress'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if otp != stored_otp:
-            return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Update user's email
         user = request.user
-        user.email = new_email
+        otp = request.data.get('otp')
+
+        if not otp:
+            return Response({'error': 'OTP is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.otp != otp:
+            return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.temp_email:
+            return Response({'error': 'No email change request found'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # OTP matched – update email
+        user.email = user.temp_email
+        user.temp_email = None
+        user.otp = None
+        user.otp_created_at = None
         user.save()
-        
-        # Clear session data
-        del request.session['email_change_otp']
-        del request.session['new_email']
-        
+
         return Response({'message': 'Email updated successfully'})
-    
+
     def _handle_password_change(self, request):
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
-        
+
         if not current_password or not new_password:
-            return Response({'error': 'Both current and new password are required'}, 
-                           status=status.HTTP_400_BAD_REQUEST)
-        
-        # Verify current password
+            return Response({'error': 'Both current and new passwords are required'}, status=status.HTTP_400_BAD_REQUEST)
+
         user = request.user
+
         if not user.check_password(current_password):
-            return Response({'error': 'Current password is incorrect'}, 
-                           status=status.HTTP_400_BAD_REQUEST)
-        
-        # Set new password
+            return Response({'error': 'Current password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
-        
+
         return Response({'message': 'Password changed successfully'})
-    
+
     def _send_email_otp(self, email, otp_code, user):
         """Send OTP to the user's email"""
         try:
-            # Simple text email for now
             subject = "Verify Your New Email Address"
-            message = f"Hello {user.username},\n\nYour verification code is: {otp_code}\n\nThis code will expire in 10 minutes."
+            message = f"Hello {user.name or user.username},\n\nYour OTP code is: {otp_code}\n\nThis code will expire in 10 minutes.\n\nRegards,\nProven Pro Team"
             from_email = settings.DEFAULT_FROM_EMAIL
-            
-            # Send email
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=from_email,
-                recipient_list=[email],
-                fail_silently=False
-            )
-            
-            return True
-            
-        except Exception as email_error:
-            print(f"Failed to send OTP email: {str(email_error)}")
+
+            send_mail(subject, message, from_email, [email], fail_silently=False)
+        except Exception as e:
             import traceback
+            print("Error sending OTP email:", str(e))
             print(traceback.format_exc())
-            return False
 #Logout View
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]

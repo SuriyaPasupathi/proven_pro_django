@@ -30,21 +30,22 @@ from django.conf import settings
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    temp_email = models.EmailField(blank=True, null=True)  # Used for email change OTP
     is_verified = models.BooleanField(default=False)
     otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)  # Tracks OTP creation time
+
     google_id = models.CharField(max_length=255, null=True, blank=True)
     is_google_user = models.BooleanField(default=False)
     reset_token = models.CharField(max_length=255, null=True, blank=True)
     token_created_at = models.DateTimeField(null=True, blank=True)
 
-    # Subscription fields
     SUBSCRIPTION_CHOICES = [('free', 'Free'), ('standard', 'Standard'), ('premium', 'Premium')]
     subscription_type = models.CharField(max_length=10, choices=SUBSCRIPTION_CHOICES, default='free')
     subscription_active = models.BooleanField(default=True)
     subscription_start_date = models.DateTimeField(null=True, blank=True)
     subscription_end_date = models.DateTimeField(null=True, blank=True)
 
-    # Profile fields
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
@@ -92,7 +93,7 @@ class Users(AbstractUser):
         super().save(*args, **kwargs)
 
     def generate_share_link(self, recipient_email, expires_in_days=1):
-        from api.models import ProfileShare  # Make sure to import your actual app name
+        from api.models import ProfileShare
         share = ProfileShare.objects.create(
             user=self,
             recipient_email=recipient_email,
@@ -133,7 +134,6 @@ The Proven Pro Team
             models.Index(fields=['subscription_start_date']),
             models.Index(fields=['profile_url']),
         ]
-
 # Proxy model for pending users
 class PendingUsers(Users):
     class Meta:
