@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from .auth_user import (
     RegisterViewSet, LoginView, google_auth, RequestResetPasswordView, 
-    PasswordResetConfirmView, LogoutView
+    PasswordResetConfirmView, LogoutView,AccountSettingsView
 )
 from .subscription import(
     SubscriptionCheckView,
@@ -62,6 +62,8 @@ urlpatterns = [
     path('verify-mobile-otp/', VerifyMobileOTPView.as_view(), name='verify-mobile-otp'),
     path('verification-status/', GetVerificationStatusView.as_view(), name='verification-status'),
     path('admin/document-approval-webhook/', admin_document_approval_webhook, name='admin-document-approval-webhook'),
+
+    path('account-settings/', AccountSettingsView.as_view(), name='account-settings'), # Add the new view here
 ]
 
 # Add this at the end to serve media files during development

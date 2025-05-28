@@ -105,7 +105,7 @@ class UsersAdmin(admin.ModelAdmin):
                 messages.WARNING
             )
 
-admin.site.register(Users, UsersAdmin)
+
 
 
 class PendingUsersAdmin(admin.ModelAdmin):
@@ -128,8 +128,11 @@ class PendingUsersAdmin(admin.ModelAdmin):
 
     pending_percentage_display.short_description = 'Pending %'
 
+
+
 admin.site.register(PendingUsers, PendingUsersAdmin)
 
 # Register other models
+admin.site.register(Users, UsersAdmin)
 admin.site.register(ProfileShare)
 admin.site.register(Review)
