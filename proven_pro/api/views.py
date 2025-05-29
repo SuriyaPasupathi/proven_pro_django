@@ -142,120 +142,125 @@ class UserSearchFilterView(APIView):
         serializer = UserProfileSerializer(users, many=True)
         return Response(serializer.data)
 
+logger = logging.getLogger(__name__)
+class profile_share_actions(APIView):
+    permission_classes = [IsAuthenticated]
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def profile_share_actions(request):
-    action = request.query_params.get('action') if request.method == 'GET' else request.data.get('action')
+    def get(self, request):
+        action = request.query_params.get('action')
 
-    # 1. Verify Profile via Share Token
-    if request.method == 'GET' and action == 'verify':
-        token = request.query_params.get('token')
+        # 1. Verify Profile via Share Token
+        if action == 'verify':
+            token = request.query_params.get('token')
+            try:
+                token = uuid.UUID(token)
+                share = ProfileShare.objects.select_related('user').get(share_token=token)
+
+                if timezone.now() > share.expires_at:
+                    return Response({'error': 'This link has expired'}, status=status.HTTP_400_BAD_REQUEST)
+
+                serializer = PublicProfileSerializer(share.user)
+                return Response({
+                    'profile': serializer.data,
+                    'share_token': str(share.share_token)
+                })
+
+            except (ProfileShare.DoesNotExist, ValueError, TypeError):
+                return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 3. Get All Reviews for Current User
+        elif action == 'get_reviews':
+            user = request.user
+            reviews = Review.objects.filter(user=user).order_by('-created_at')
+            serializer = ReviewSerializer(reviews, many=True)
+            return Response(serializer.data)
+
+        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        action = request.data.get('action')
+
+        # 2. Generate Profile Share Link and Send Email
+        if action == 'generate':
+            user = request.user
+            recipient_email = request.data.get('email')
+
+            if not recipient_email:
+                return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            share_token = user.generate_share_link(recipient_email)
+            verification_url = f"{settings.FRONTEND_URL}/profile/{share_token}"
+
+            try:
+                context = {
+                    'user_name': user.name,
+                    'verification_url': verification_url
+                }
+                html_content = render_to_string('emails/profile_share.html', context)
+
+                subject = f"Profile Review Request from {user.name}"
+                email = EmailMessage(
+                    subject=subject,
+                    body=html_content,
+                    from_email=settings.EMAIL_HOST_USER,
+                    to=[recipient_email],
+                )
+                email.content_subtype = "html"
+                email.send(fail_silently=False)
+
+                return Response({
+                    'message': 'Share link sent successfully',
+                    'share_token': share_token,
+                    'verification_url': verification_url
+                })
+
+            except Exception as e:
+                logger.error(f"Email sending failed: {str(e)}")
+                return Response({
+                    'message': 'Share link created but email sending failed. Please share the link manually.',
+                    'share_token': share_token,
+                    'verification_url': verification_url
+                }, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+class submit_profile_review(APIView):
+    permission_classes = [AllowAny]  # Or use custom token-based auth if needed
+
+    def post(self, request):
+        token = request.data.get('share_token')
         try:
-            token = uuid.UUID(token)
-            share = ProfileShare.objects.select_related('user').get(share_token=token)
+            share = ProfileShare.objects.get(share_token=token)
 
-            if timezone.now() > share.expires_at:
-                return Response({'error': 'This link has expired'}, status=status.HTTP_400_BAD_REQUEST)
+            if not share.is_valid():
+                return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
-            serializer = PublicProfileSerializer(share.user)
-            return Response({
-                'profile': serializer.data,
-                'share_token': str(share.share_token)
-            })
-
-        except (ProfileShare.DoesNotExist, ValueError, TypeError):
-            return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
-
-    # 2. Generate Profile Share Link and Send Email
-    if request.method == 'POST' and action == 'generate':
-        user = request.user
-        recipient_email = request.data.get('email')
-
-        if not recipient_email:
-            return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        share_token = user.generate_share_link(recipient_email)
-        verification_url = f"{settings.FRONTEND_URL}/profile/{share_token}"
-
-        try:
-            context = {
-                'user_name': user.name,
-                'verification_url': verification_url
+            review_data = {
+                'user': share.user.id,
+                'reviewer_name': request.data.get('reviewer_name'),
+                'rating': request.data.get('rating'),
+                'comment': request.data.get('comment')
             }
-            html_content = render_to_string('emails/profile_share.html', context)
 
-            subject = f"Profile Review Request from {user.name}"
-            email = EmailMessage(
-                subject=subject,
-                body=html_content,
-                from_email=settings.EMAIL_HOST_USER,
-                to=[recipient_email],
-            )
-            email.content_subtype = "html"
-            email.send(fail_silently=False)
+            if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
+                return Response({
+                    'error': 'reviewer_name, rating, and comment are required fields'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response({
-                'message': 'Share link sent successfully',
-                'share_token': share_token,
-                'verification_url': verification_url
-            })
+            serializer = ReviewSerializer(data=review_data)
+            if serializer.is_valid():
+                review = serializer.save()
+                return Response({
+                    'message': 'Review submitted successfully',
+                    'review': ReviewSerializer(review).data
+                }, status=status.HTTP_201_CREATED)
 
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except ProfileShare.DoesNotExist:
+            return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Email sending failed: {str(e)}")
-            return Response({
-                'message': 'Share link created but email sending failed. Please share the link manually.',
-                'share_token': share_token,
-                'verification_url': verification_url
-            }, status=status.HTTP_201_CREATED)
-
-    # 3. Get All Reviews for Current User
-    if request.method == 'GET' and action == 'get_reviews':
-        user = request.user
-        reviews = Review.objects.filter(user=user).order_by('-created_at')
-        serializer = ReviewSerializer(reviews, many=True)
-        return Response(serializer.data)
-
-    return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['POST'])
-@permission_classes([AllowAny])  # Or use custom token-based auth if needed
-def submit_profile_review(request):
-    token = request.data.get('share_token')
-    try:
-        share = ProfileShare.objects.get(share_token=token)
-
-        if not share.is_valid():
-            return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
-
-        review_data = {
-            'user': share.user.id,
-            'reviewer_name': request.data.get('reviewer_name'),
-            'rating': request.data.get('rating'),
-            'comment': request.data.get('comment')
-        }
-
-        if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
-            return Response({
-                'error': 'reviewer_name, rating, and comment are required fields'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = ReviewSerializer(data=review_data)
-        if serializer.is_valid():
-            review = serializer.save()
-            return Response({
-                'message': 'Review submitted successfully',
-                'review': ReviewSerializer(review).data
-            }, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    except ProfileShare.DoesNotExist:
-        return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        logger.error(f"Error submitting review: {str(e)}")
-        return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+            logger.error(f"Error submitting review: {str(e)}")
+            return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CheckProfileStatusView(APIView):
@@ -447,52 +452,51 @@ class GetVerificationStatusView(APIView):
             }
         })
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def admin_document_approval_webhook(request):
-    """
-    Webhook for admin document approval notifications.
-    This can be called from admin actions or other admin interfaces.
-    """
-    user_id = request.data.get('user_id')
-    document_type = request.data.get('document_type')
-    is_approved = request.data.get('is_approved', False)
-    
-    if not user_id or not document_type:
-        return Response({
-            'error': 'Missing required parameters'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        user = Users.objects.get(id=user_id)
-        
-        if document_type == 'gov_id':
-            user.gov_id_verified = is_approved
-        elif document_type == 'address':
-            user.address_verified = is_approved
-        else:
-            return Response({
-                'error': 'Invalid document type'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        user.save(update_fields=[f'{document_type}_verified'])
-        
-        # Send notification email
-        user.send_verification_status_email(document_type, is_approved)
-        
-        return Response({
-            'success': True,
-            'message': f'{document_type.replace("_", " ").title()} {"approved" if is_approved else "rejected"} successfully',
-            'user_id': str(user.id),
-            'verification_status': user.verification_status
-        })
-        
-    except Users.DoesNotExist:
-        return Response({
-            'error': 'User not found'
-        }, status=status.HTTP_404_NOT_FOUND)
-    
+class admin_document_approval_webhook(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        """
+        Webhook for admin document approval notifications.
+        This can be called from admin actions or other admin interfaces.
+        """
+        user_id = request.data.get('user_id')
+        document_type = request.data.get('document_type')
+        is_approved = request.data.get('is_approved', False)
+
+        if not user_id or not document_type:
+            return Response({
+                'error': 'Missing required parameters'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+
+            if document_type == 'gov_id':
+                user.gov_id_verified = is_approved
+            elif document_type == 'address':
+                user.address_verified = is_approved
+            else:
+                return Response({
+                    'error': 'Invalid document type'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            user.save(update_fields=[f'{document_type}_verified'])
+
+            # Send notification email
+            user.send_verification_status_email(document_type, is_approved)
+
+            return Response({
+                'success': True,
+                'message': f'{document_type.replace("_", " ").title()} {"approved" if is_approved else "rejected"} successfully',
+                'user_id': str(user.id),
+                'verification_status': user.verification_status
+            })
+
+        except Users.DoesNotExist:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
 
 
 
