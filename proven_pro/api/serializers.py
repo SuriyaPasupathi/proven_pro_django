@@ -100,228 +100,198 @@ class PortfolioSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    # Include all related data with nested serializers
+    # Related data
     social_links = SocialLinkSerializer(many=True, read_only=True)
     client_reviews = ReviewSerializer(many=True, read_only=True)
-    work_experiences = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications = CertificationSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
     projects = PortfolioSerializer(many=True, read_only=True)
-    
-    # Add  portfolio data
-    # Fix the experiences field to use the work_experiences_Serializer
     experiences = work_experiences_Serializer(many=True, read_only=True)
-    
-    # Fields for nested creation
+
+    # File URL fields
+    profile_pic_url = serializers.SerializerMethodField(read_only=True)
+    video_intro_url = serializers.SerializerMethodField(read_only=True)
+
+    # Write-only fields for nested creation
+    work_experiences = serializers.CharField(write_only=True, required=False, allow_blank=True)
     linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
     facebook = serializers.URLField(write_only=True, required=False, allow_blank=True)
     twitter = serializers.URLField(write_only=True, required=False, allow_blank=True)
-    
-    #Experience fields for direct creation
+
+    # Experience direct fields
     company_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     position = serializers.CharField(write_only=True, required=False, allow_blank=True)
     experience_start_date = serializers.DateField(write_only=True, required=False)
     experience_end_date = serializers.DateField(write_only=True, required=False)
     key_responsibilities = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    
-    # Project fields for direct creation
+
+    # Project fields
     project_title = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_url = serializers.URLField(write_only=True, required=False, allow_blank=True)
     project_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    
-    # Certification fields for direct creation
+
+    # Certification fields
     certifications_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_issuer = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_issued_date = serializers.DateField(write_only=True, required=False)
     certifications_expiration_date = serializers.DateField(write_only=True, required=False, allow_null=True)
     certifications_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_image = serializers.ImageField(write_only=True, required=False)
-    
-    # Service category fields for direct access
+
+    # Service Category fields
     services_categories = serializers.CharField(write_only=True, required=False, allow_blank=True)
     services_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     rate_range = serializers.CharField(write_only=True, required=False, allow_blank=True)
     availability = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    
-    verification_status = serializers.IntegerField(read_only=True)
-    
-    # Add these fields as write-only to avoid serialization issues
+
+    # Media
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
-    
-    # Add URL fields for reading the file URLs
-    profile_pic_url = serializers.SerializerMethodField(read_only=True)
-    video_intro_url = serializers.SerializerMethodField(read_only=True)
-    
+
+    # Read-only
+    verification_status = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Users
         fields = (
             'id', 'username', 'email', 'subscription_type', 'subscription_active',
             'subscription_start_date', 'subscription_end_date',
-            'first_name', 'last_name', 'bio', 'profile_pic', 'profile_pic_url', 
+            'first_name', 'last_name', 'bio', 'profile_pic', 'profile_pic_url',
             'rating', 'profile_url', 'profile_mail', 'mobile',
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
             'social_links', 'client_reviews', 'experiences', 'certifications',
-            'categories', 'projects',
-            'video_intro', 'video_intro_url', 'video_description',
+            'categories', 'projects', 'video_intro', 'video_intro_url', 'video_description',
             'linkedin', 'facebook', 'twitter',
-            'work_experiences', 'company_name', 'position', 'experience_start_date', 
+            'work_experiences', 'company_name', 'position', 'experience_start_date',
             'experience_end_date', 'key_responsibilities',
             'project_title', 'project_description', 'project_url', 'project_image',
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
             'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
             'mobile_verified', 'verification_status',
         )
-    
+
     def get_profile_pic_url(self, obj):
-        if obj.profile_pic:
-            return obj.profile_pic.url
-        return None
-    
+        return obj.profile_pic.url if obj.profile_pic else None
+
     def get_video_intro_url(self, obj):
-        if obj.video_intro:
-            return obj.video_intro.url
-        return None
-    
+        return obj.video_intro.url if obj.video_intro else None
+
     def validate(self, data):
-        # Extract data before validation
         self.work_experiences_data = self.initial_data.get('work_experiences')
         self.portfolio_data = self.initial_data.get('portfolio')
         self.certifications_data = self.initial_data.get('certifications')
         self.categories_data = self.initial_data.get('categories')
         self.social_links_data = self.initial_data.get('social_links')
 
-        # Store project images if they exist
-        self.project_images = {}
-        for key in self.initial_data:
-            if key.startswith('project_image_'):
-                index = key.split('_')[-1]
-                self.project_images[index] = self.initial_data[key]
-        
+        self.project_images = {
+            key.split('_')[-1]: self.initial_data[key]
+            for key in self.initial_data if key.startswith('project_image_')
+        }
+
         print(f"Extracted work_experiences: {self.work_experiences_data}")
         print(f"Extracted portfolio: {self.portfolio_data}")
         print(f"Extracted project images: {self.project_images.keys()}")
-        
+        print(f"extracted categories:{self.categories_data}")
+
         return data
-    
+
     def update(self, instance, validated_data):
-        # Process work experiences
-        work_experiences_data = getattr(self, 'work_experiences_data', None)
-        if work_experiences_data:
+        # Work experiences
+        if self.work_experiences_data:
             try:
-                experiences_list = json.loads(work_experiences_data)
-                
-                if isinstance(experiences_list, list):
-                    for exp_data in experiences_list:
-                        Experiences.objects.create(
-                            user=instance,
-                            company_name=exp_data.get('company_name', ''),
-                            position=exp_data.get('position', ''),
-                            experience_start_date=exp_data.get('experience_start_date'),
-                            experience_end_date=exp_data.get('experience_end_date'),
-                            key_responsibilities=exp_data.get('key_responsibilities', '')
-                        )
+                experiences_list = json.loads(self.work_experiences_data)
+                for exp in experiences_list:
+                    Experiences.objects.create(
+                        user=instance,
+                        company_name=exp.get('company_name', ''),
+                        position=exp.get('position', ''),
+                        experience_start_date=exp.get('experience_start_date'),
+                        experience_end_date=exp.get('experience_end_date'),
+                        key_responsibilities=exp.get('key_responsibilities', '')
+                    )
             except Exception as e:
-                print(f"Error processing experiences: {str(e)}")
-        
-        # Process portfolio data
-        portfolio_data = getattr(self, 'portfolio_data', None)
-        project_images = getattr(self, 'project_images', {})
-        
-        if portfolio_data:
+                print(f"Error processing experiences: {e}")
+
+        # Portfolio
+        if self.portfolio_data:
             try:
-                print(f"Processing portfolio data: {portfolio_data}")
-                projects_list = json.loads(portfolio_data)
-                
-                if isinstance(projects_list, list):
-                    for i, proj_data in enumerate(projects_list):
-                        # Get the corresponding image if it exists
-                        project_image = project_images.get(str(i))
-                        
-                        print(f"Creating project {i}: {proj_data}")
-                        print(f"With image: {project_image is not None}")
-                        
-                        # Create new project
-                        Portfolio.objects.create(
-                            user=instance,
-                            project_title=proj_data.get('project_title', ''),
-                            project_description=proj_data.get('project_description', ''),
-                            project_url=proj_data.get('project_url', ''),
-                            project_image=project_image
-                        )
+                projects_list = json.loads(self.portfolio_data)
+                for i, proj in enumerate(projects_list):
+                    Portfolio.objects.create(
+                        user=instance,
+                        project_title=proj.get('project_title', ''),
+                        project_description=proj.get('project_description', ''),
+                        project_url=proj.get('project_url', ''),
+                        project_image=self.project_images.get(str(i))
+                    )
             except Exception as e:
-                print(f"Error processing portfolio: {str(e)}")
+                print(f"Error processing portfolio: {e}")
                 import traceback
                 print(traceback.format_exc())
-        
-        # Process certification data
-        certifications_name = validated_data.pop('certifications_name', None)
-        certifications_issuer = validated_data.pop('certifications_issuer', None)
-        certifications_issued_date = validated_data.pop('certifications_issued_date', None)
-        certifications_expiration_date = validated_data.pop('certifications_expiration_date', None)
-        certifications_id = validated_data.pop('certifications_id', None)
-        certifications_image = validated_data.pop('certifications_image', None)
-        
-        # If we have certification data, create a new certification
-        if certifications_name and certifications_issuer and certifications_issued_date:
+
+        # Certification
+        if validated_data.get('certifications_name') and validated_data.get('certifications_issuer') and validated_data.get('certifications_issued_date'):
             try:
-                # Create new certification
                 certification = Certification.objects.create(
                     user=instance,
-                    certifications_name=certifications_name,
-                    certifications_issuer=certifications_issuer,
-                    certifications_issued_date=certifications_issued_date,
-                    certifications_expiration_date=certifications_expiration_date,
-                    certifications_id=certifications_id or '',
-                    certifications_image=certifications_image
+                    certifications_name=validated_data.pop('certifications_name'),
+                    certifications_issuer=validated_data.pop('certifications_issuer'),
+                    certifications_issued_date=validated_data.pop('certifications_issued_date'),
+                    certifications_expiration_date=validated_data.pop('certifications_expiration_date', None),
+                    certifications_id=validated_data.pop('certifications_id', ''),
+                    certifications_image=validated_data.pop('certifications_image', None)
                 )
-                
-                # If there's an image URL, store it
-                certifications_image_url = self.initial_data.get('certifications_image_url')
-                if certifications_image_url and certifications_image_url.startswith('http'):
-                    certification.certifications_image_url = certifications_image_url
+                image_url = self.initial_data.get('certifications_image_url')
+                if image_url and image_url.startswith('http'):
+                    certification.certifications_image_url = image_url
                     certification.save()
-                    
-                print(f"Created certification: {certification.id}")
             except Exception as e:
-                print(f"Error creating certification: {str(e)}")
+                print(f"Error creating certification: {e}")
+                logging.error(f"Error creating certification: {e}")
 
-                # Log the error for debugging
-                logging.error(f"Error creating certification: {str(e)}")
-        
-        # Process service category data
-        services_categories = validated_data.pop('services_categories', None)
-        services_description = validated_data.pop('services_description', None)
-        rate_range = validated_data.pop('rate_range', None)
-        availability = validated_data.pop('availability', None)
-        
-        # If we have service category data, create a new service category
-        if services_categories or services_description or rate_range or availability:
+        # Service categories
+        categories_data = getattr(self, 'categories_data', [])
+        print("📦 Raw categories_data:", categories_data)
+
+        # Convert from string to list if needed
+        if isinstance(categories_data, str):
             try:
-                # Create new service category
-                service_category = ServiceCategory.objects.create(
-                    user=instance,
-                    services_categories=services_categories or '',
-                    services_description=services_description or '',
-                    rate_range=rate_range or '',
-                    availability=availability or ''
-                )
-                print(f"Created service category: {service_category.id}")
-            except Exception as e:
-                print(f"Error creating service category: {str(e)}")
-                logging.error(f"Error creating service category: {str(e)}")
-        
-        # Update the user instance with the remaining validated data
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        
-        instance.save()
-        
-        return instance
+                categories_data = json.loads(categories_data)
+                print("✅ Parsed categories_data:", categories_data)
+            except json.JSONDecodeError as e:
+                print("❌ JSON decode error:", e)
+                categories_data = []
 
+        if isinstance(categories_data, list):
+            for idx, category in enumerate(categories_data):
+                print(f"🔍 Processing category {idx + 1}: {category}")
+                if isinstance(category, dict):
+                    try:
+                        sc = ServiceCategory.objects.create(
+                            user=instance,
+                            services_categories=category.get('services_categories', ''),
+                            services_description=category.get('services_description', ''),
+                            rate_range=category.get('rate_range', ''),
+                            availability=category.get('availability', '')
+                        )
+                        print(f"✅ Saved ServiceCategory ID: {sc.id}")
+                    except Exception as e:
+                        print(f"❌ Failed to save category: {e}")
+                else:
+                    print("⚠️ Skipped non-dict item.")
+        else:
+            print("⚠️ categories_data is not a list even after parsing.")
+
+        instance.username = validated_data.get('username', instance.username)
+        instance.email = validated_data.get('email', instance.email)
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.save()
+
+        return instance
 
 class RequestPasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
