@@ -100,37 +100,33 @@ class PortfolioSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    # Related data
+    # Related nested fields
     social_links = SocialLinkSerializer(many=True, read_only=True)
     client_reviews = ReviewSerializer(many=True, read_only=True)
+    experiences = work_experiences_Serializer(many=True, read_only=True)
     certifications = CertificationSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
     projects = PortfolioSerializer(many=True, read_only=True)
-    experiences = work_experiences_Serializer(many=True, read_only=True)
 
-    # File URL fields
-    profile_pic_url = serializers.SerializerMethodField(read_only=True)
-    video_intro_url = serializers.SerializerMethodField(read_only=True)
-
-    # Write-only fields for nested creation
+    # Write-only direct create fields
     work_experiences = serializers.CharField(write_only=True, required=False, allow_blank=True)
     linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
     facebook = serializers.URLField(write_only=True, required=False, allow_blank=True)
     twitter = serializers.URLField(write_only=True, required=False, allow_blank=True)
-
-    # Experience direct fields
+    
+    # Experience fields
     company_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     position = serializers.CharField(write_only=True, required=False, allow_blank=True)
     experience_start_date = serializers.DateField(write_only=True, required=False)
     experience_end_date = serializers.DateField(write_only=True, required=False)
     key_responsibilities = serializers.CharField(write_only=True, required=False, allow_blank=True)
-
+    
     # Project fields
     project_title = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_url = serializers.URLField(write_only=True, required=False, allow_blank=True)
     project_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-
+    
     # Certification fields
     certifications_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_issuer = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -139,34 +135,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
     certifications_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_image = serializers.ImageField(write_only=True, required=False)
 
-    # Service Category fields
+    # Service category
     services_categories = serializers.CharField(write_only=True, required=False, allow_blank=True)
     services_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     rate_range = serializers.CharField(write_only=True, required=False, allow_blank=True)
     availability = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    # Media
+    # Media Fields
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
-
-    # Read-only
-    verification_status = serializers.IntegerField(read_only=True)
+    profile_pic_url = serializers.SerializerMethodField(read_only=True)
+    video_intro_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Users
         fields = (
             'id', 'username', 'email', 'subscription_type', 'subscription_active',
             'subscription_start_date', 'subscription_end_date',
-            'first_name', 'last_name', 'bio', 'profile_pic', 'profile_pic_url',
-            'rating', 'profile_url', 'profile_mail', 'mobile',
+            'first_name', 'last_name', 'bio',
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
-            'social_links', 'client_reviews', 'experiences', 'certifications',
-            'categories', 'projects', 'video_intro', 'video_intro_url', 'video_description',
+            'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail', 'mobile',
+            'social_links', 'client_reviews', 'experiences', 'certifications', 'categories', 'projects',
+            'video_intro', 'video_intro_url', 'video_description',
             'linkedin', 'facebook', 'twitter',
-            'work_experiences', 'company_name', 'position', 'experience_start_date',
+            'work_experiences', 'company_name', 'position', 'experience_start_date', 
             'experience_end_date', 'key_responsibilities',
             'project_title', 'project_description', 'project_url', 'project_image',
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date',
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
             'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
@@ -191,19 +186,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
             for key in self.initial_data if key.startswith('project_image_')
         }
 
-        print(f"Extracted work_experiences: {self.work_experiences_data}")
-        print(f"Extracted portfolio: {self.portfolio_data}")
-        print(f"Extracted project images: {self.project_images.keys()}")
-        print(f"extracted categories:{self.categories_data}")
-
         return data
 
     def update(self, instance, validated_data):
-        # Work experiences
+        # ✅ Direct field updates
+        for field in ['first_name', 'last_name', 'bio', 'primary_tools', 'technical_skills',
+                      'soft_skills', 'skills_description', 'video_description', 'mobile']:
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+
+        if 'profile_pic' in validated_data:
+            instance.profile_pic = validated_data['profile_pic']
+
+        if 'video_intro' in validated_data:
+            instance.video_intro = validated_data['video_intro']
+
+        instance.save()
+
+        # ✅ Process work_experiences
         if self.work_experiences_data:
             try:
-                experiences_list = json.loads(self.work_experiences_data)
-                for exp in experiences_list:
+                for exp in json.loads(self.work_experiences_data):
                     Experiences.objects.create(
                         user=instance,
                         company_name=exp.get('company_name', ''),
@@ -213,46 +216,46 @@ class UserProfileSerializer(serializers.ModelSerializer):
                         key_responsibilities=exp.get('key_responsibilities', '')
                     )
             except Exception as e:
-                print(f"Error processing experiences: {e}")
+                print(f"Experience Error: {e}")
 
-        # Portfolio
+        # ✅ Process portfolio data
         if self.portfolio_data:
             try:
-                projects_list = json.loads(self.portfolio_data)
-                for i, proj in enumerate(projects_list):
+                for i, proj in enumerate(json.loads(self.portfolio_data)):
+                    project_image = self.project_images.get(str(i))
                     Portfolio.objects.create(
                         user=instance,
                         project_title=proj.get('project_title', ''),
                         project_description=proj.get('project_description', ''),
                         project_url=proj.get('project_url', ''),
-                        project_image=self.project_images.get(str(i))
+                        project_image=project_image
                     )
             except Exception as e:
-                print(f"Error processing portfolio: {e}")
-                import traceback
-                print(traceback.format_exc())
+                print(f"Portfolio Error: {e}")
 
-        # Certification
-        if validated_data.get('certifications_name') and validated_data.get('certifications_issuer') and validated_data.get('certifications_issued_date'):
-            try:
-                certification = Certification.objects.create(
-                    user=instance,
-                    certifications_name=validated_data.pop('certifications_name'),
-                    certifications_issuer=validated_data.pop('certifications_issuer'),
-                    certifications_issued_date=validated_data.pop('certifications_issued_date'),
-                    certifications_expiration_date=validated_data.pop('certifications_expiration_date', None),
-                    certifications_id=validated_data.pop('certifications_id', ''),
-                    certifications_image=validated_data.pop('certifications_image', None)
-                )
-                image_url = self.initial_data.get('certifications_image_url')
-                if image_url and image_url.startswith('http'):
-                    certification.certifications_image_url = image_url
-                    certification.save()
-            except Exception as e:
-                print(f"Error creating certification: {e}")
-                logging.error(f"Error creating certification: {e}")
+        # ✅ Process certifications
+        cert_data = {
+            'name': validated_data.pop('certifications_name', None),
+            'issuer': validated_data.pop('certifications_issuer', None),
+            'issued': validated_data.pop('certifications_issued_date', None),
+            'expire': validated_data.pop('certifications_expiration_date', None),
+            'cert_id': validated_data.pop('certifications_id', None),
+            'image': validated_data.pop('certifications_image', None),
+        }
 
-        # Service categories
+        if cert_data['name']:
+            Certification.objects.create(
+                user=instance,
+                certifications_name=cert_data['name'],
+                certifications_issuer=cert_data['issuer'],
+                certifications_issued_date=cert_data['issued'],
+                certifications_expiration_date=cert_data['expire'],
+                certifications_id=cert_data['cert_id'],
+                certifications_image_url=cert_data['image']
+            )
+
+        # ✅ Process services
+        # Process service category data
         categories_data = getattr(self, 'categories_data', [])
         print("📦 Raw categories_data:", categories_data)
 
@@ -292,6 +295,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+
+
+
 
 class RequestPasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
