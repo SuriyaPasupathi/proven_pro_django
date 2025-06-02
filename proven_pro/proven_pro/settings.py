@@ -238,3 +238,4 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 
 
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'eac2-103-186-120-4.ngrok-free.app']

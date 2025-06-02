@@ -36,7 +36,7 @@ urlpatterns = [
     path('health_check', health_check, name='health_check'),
     path('dropdown/',DropdownAPIView.as_view,name='dropdown'),
     #auth
-    path('google-auth/', google_auth, name='google-auth'),
+    path('google-auth/', google_auth.as_view(), name='google-auth'),
     path('login/', LoginView.as_view(), name='login'),
     path('profile_status/', CheckProfileStatusView.as_view(), name='profile-status'),
     path('request-reset-password/', RequestResetPasswordView.as_view(), name='request-reset-password'),
@@ -47,8 +47,8 @@ urlpatterns = [
     path('', include(router.urls)),
 
     #profile
-    path('request-profile-share/', profile_share_actions, name='profile_share_actions'),
-    path('submit-profile-review/', submit_profile_review, name='submit-profile-review'),
+    path('profile-share/', profile_share_actions.as_view(), name='profile_share_actions'),
+    path('submit-profile-review/', submit_profile_review.as_view(), name='submit-profile-review'),
     
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
@@ -68,7 +68,7 @@ urlpatterns = [
     path('request-mobile-verification/', RequestMobileVerificationView.as_view(), name='request-mobile-verification'),
     path('verify-mobile-otp/', VerifyMobileOTPView.as_view(), name='verify-mobile-otp'),
     path('verification-status/', GetVerificationStatusView.as_view(), name='verification-status'),
-    path('admin/document-approval-webhook/', admin_document_approval_webhook, name='admin-document-approval-webhook'),
+    path('admin/document-approval-webhook/', admin_document_approval_webhook.as_view(), name='admin-document-approval-webhook'),
 
     path('account-settings/', AccountSettingsView.as_view(), name='account-settings'), # Add the new view here
 ]

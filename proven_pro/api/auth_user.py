@@ -28,138 +28,138 @@ User = get_user_model()
 
 
 #google_auth_view
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def google_auth(request):
-    print("Google auth endpoint called")
-    print(f"Request data: {request.data}")
-    
-    token = request.data.get('token')
-    if not token:
-        print("No token provided")
-        return Response({'error': 'Google token is required'}, status=status.HTTP_400_BAD_REQUEST)
+class google_auth(APIView):
+    permission_classes = [AllowAny]
 
-    try:
-        # Use Google endpoint to validate ID token
-        response = requests.get(
-            'https://oauth2.googleapis.com/tokeninfo',
-            params={'id_token': token}
-        )
+    def post(self, request):
+        print("Google auth endpoint called")
+        print(f"Request data: {request.data}")
         
-        print(f"Google response status: {response.status_code}")
-        if response.content:
-            print(f"Google response content: {response.content[:200]}")
-        
-        if not response.ok:
-            # Try alternative endpoint
+        token = request.data.get('token')
+        if not token:
+            print("No token provided")
+            return Response({'error': 'Google token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Use Google endpoint to validate ID token
             response = requests.get(
-                'https://www.googleapis.com/oauth2/v3/userinfo',
-                headers={'Authorization': f'Bearer {token}'}
+                'https://oauth2.googleapis.com/tokeninfo',
+                params={'id_token': token}
             )
             
-            print(f"Second attempt - Google response status: {response.status_code}")
+            print(f"Google response status: {response.status_code}")
             if response.content:
-                print(f"Second attempt - Google response content: {response.content[:200]}")
+                print(f"Google response content: {response.content[:200]}")
             
             if not response.ok:
-                return Response({
-                    'error': 'Invalid Google token',
-                    'google_status': response.status_code,
-                    'google_response': response.text
-                }, status=status.HTTP_401_UNAUTHORIZED)
-
-        google_data = response.json()
-        print(f"Google data received: {google_data}")
-
-        email = google_data.get('email')
-        google_id = google_data.get('sub')
-        name = google_data.get('name', '')
-
-        if not email or not google_id:
-            return Response({'error': 'Email or ID missing'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check if user exists
-        try:
-            user = User.objects.filter(email=email).first()
-            
-            if user:
-                print(f"Found existing user: {user.email}")
-                # If user already exists but google_id not set
-                if not user.google_id:
-                    print(f"Updating existing user with Google ID: {google_id}")
-                    user.google_id = google_id
-                    user.is_google_user = True
-                    user.save()
-            else:
-                # Create new user
-                print(f"Creating new user with email: {email}")
-                name_parts = name.split(' ', 1)
-                first_name = name_parts[0]
-                last_name = name_parts[1] if len(name_parts) > 1 else ''
-                
-                username = f'google_{google_id[:10]}'
-                
-                # Make username unique if needed
-                i = 1
-                temp_username = username
-                while User.objects.filter(username=temp_username).exists():
-                    temp_username = f"{username}_{i}"
-                    i += 1
-                username = temp_username
-                
-                # Use create_user method for proper password hashing
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    password=str(uuid.uuid4()),  # Random password
-                    google_id=google_id,
-                    is_google_user=True,
-                    first_name=first_name,
-                    last_name=last_name,
-                    subscription_type='free'
+                # Try alternative endpoint
+                response = requests.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers={'Authorization': f'Bearer {token}'}
                 )
-                print(f"Created new user: {user.email}")
+                
+                print(f"Second attempt - Google response status: {response.status_code}")
+                if response.content:
+                    print(f"Second attempt - Google response content: {response.content[:200]}")
+                
+                if not response.ok:
+                    return Response({
+                        'error': 'Invalid Google token',
+                        'google_status': response.status_code,
+                        'google_response': response.text
+                    }, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Generate JWT
-            refresh = RefreshToken.for_user(user)
-            print(f"Generated tokens for user: {user.email}")
+            google_data = response.json()
+            print(f"Google data received: {google_data}")
 
-            # Check if user has completed their profile
-            has_profile = bool(
-                user.first_name and 
-                user.last_name and 
-                hasattr(user, 'job_title') and user.job_title
-            )
+            email = google_data.get('email')
+            google_id = google_data.get('sub')
+            name = google_data.get('name', '')
 
-            return Response({
-                'message': 'Login successful!',
-                'access': str(refresh.access_token),
-                'refresh': str(refresh),
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                },
-                'has_profile': has_profile,
-                'subscription_type': user.subscription_type
-            })
+            if not email or not google_id:
+                return Response({'error': 'Email or ID missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-        except Exception as user_error:
-            print(f"Error handling user: {str(user_error)}")
+            # Check if user exists
+            try:
+                user = User.objects.filter(email=email).first()
+                
+                if user:
+                    print(f"Found existing user: {user.email}")
+                    # If user already exists but google_id not set
+                    if not user.google_id:
+                        print(f"Updating existing user with Google ID: {google_id}")
+                        user.google_id = google_id
+                        user.is_google_user = True
+                        user.save()
+                else:
+                    # Create new user
+                    print(f"Creating new user with email: {email}")
+                    name_parts = name.split(' ', 1)
+                    first_name = name_parts[0]
+                    last_name = name_parts[1] if len(name_parts) > 1 else ''
+                    
+                    username = f'google_{google_id[:10]}'
+                    
+                    # Make username unique if needed
+                    i = 1
+                    temp_username = username
+                    while User.objects.filter(username=temp_username).exists():
+                        temp_username = f"{username}_{i}"
+                        i += 1
+                    username = temp_username
+                    
+                    # Use create_user method for proper password hashing
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        password=str(uuid.uuid4()),  # Random password
+                        google_id=google_id,
+                        is_google_user=True,
+                        first_name=first_name,
+                        last_name=last_name,
+                        subscription_type='free'
+                    )
+                    print(f"Created new user: {user.email}")
+
+                # Generate JWT
+                refresh = RefreshToken.for_user(user)
+                print(f"Generated tokens for user: {user.email}")
+
+                # Check if user has completed their profile
+                has_profile = bool(
+                    user.first_name and 
+                    user.last_name and 
+                    hasattr(user, 'job_title') and user.job_title
+                )
+
+                return Response({
+                    'message': 'Login successful!',
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                    },
+                    'has_profile': has_profile,
+                    'subscription_type': user.subscription_type
+                })
+
+            except Exception as user_error:
+                print(f"Error handling user: {str(user_error)}")
+                import traceback
+                print(traceback.format_exc())
+                return Response({'error': f'User processing error: {str(user_error)}'}, 
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
             import traceback
+            print(f"Error in google_auth: {str(e)}")
             print(traceback.format_exc())
-            return Response({'error': f'User processing error: {str(user_error)}'}, 
-                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    except Exception as e:
-        import traceback
-        print(f"Error in google_auth: {str(e)}")
-        print(traceback.format_exc())
-        return Response({'error': f'Unexpected error: {str(e)}'}, 
-                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            return Response({'error': f'Unexpected error: {str(e)}'}, 
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class RegisterViewSet(viewsets.ViewSet):
     """
