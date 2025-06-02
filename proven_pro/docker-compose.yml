@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: gunicorn proven_pro.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - ./media:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=proven_pro_db
+      - DB_USER=proven_pro_user
+      - DB_PASSWORD=proven_pro_password
+      - DB_HOST=db
+      - DB_PORT=3306
+      - SECRET_KEY=your-secret-key-here
+      - EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USE_TLS=True
+      - EMAIL_HOST_USER=your-email@gmail.com
+      - EMAIL_HOST_PASSWORD=your-app-password
+      - DEFAULT_FROM_EMAIL=your-email@gmail.com
+      - EMAIL_TIMEOUT=30
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: mysql:8.0
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=proven_pro_db
+      - MYSQL_USER=proven_pro_user
+      - MYSQL_PASSWORD=proven_pro_password
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mysql_data:
+  redis_data:

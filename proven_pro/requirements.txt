@@ -18,3 +18,5 @@ stripe
 python-decouple
 pytest-django
 mysql-connector-python
+gunicorn
+redis
