@@ -13,8 +13,8 @@ services:
       - DEBUG=1
       - DB_ENGINE=django.db.backends.mysql
       - DB_NAME=proven_pro_db
-      - DB_USER=proven_pro_user
-      - DB_PASSWORD=proven_pro_password
+      - DB_USER=root
+      - DB_PASSWORD=1234
       - DB_HOST=db
       - DB_PORT=3306
       - SECRET_KEY=your-secret-key-here
@@ -37,9 +37,9 @@ services:
       - mysql_data:/var/lib/mysql
     environment:
       - MYSQL_DATABASE=proven_pro_db
-      - MYSQL_USER=proven_pro_user
-      - MYSQL_PASSWORD=proven_pro_password
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=1234
+      - MYSQL_ROOT_PASSWORD=1234
     ports:
       - "3306:3306"
 
