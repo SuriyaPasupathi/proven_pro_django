@@ -1,10 +1,18 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.contrib import messages
-from .models import Users, PendingUsers, ProfileShare, Review
+from .models import Users, PendingUsers, ProfileShare, Review, ToolsSkillsCategory,JobPosition,Service_drop_down,Skill
 from django.db import models
 from django.db.models import Q
 
+class SkillInline(admin.TabularInline):
+    model = Skill
+    extra = 1
+
+@admin.register(ToolsSkillsCategory)
+class ToolsSkillsCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name']
+    inlines = [SkillInline]
 
 class UsersAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'subscription_type', 'verification_status_display')
@@ -106,8 +114,6 @@ class UsersAdmin(admin.ModelAdmin):
             )
 
 
-
-
 class PendingUsersAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'pending_percentage_display')
     search_fields = ('email', 'first_name', 'last_name')
@@ -136,3 +142,6 @@ admin.site.register(PendingUsers, PendingUsersAdmin)
 admin.site.register(Users, UsersAdmin)
 admin.site.register(ProfileShare)
 admin.site.register(Review)
+admin.site.register(Skill)
+admin.site.register(JobPosition)
+admin.site.register(Service_drop_down)

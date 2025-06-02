@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import SocialLink, Review, ProfileShare,Experiences, Certification, ServiceCategory, Portfolio
+from .models import SocialLink, Review, ProfileShare,Experiences, Certification, ServiceCategory, Portfolio,JobPosition,Service_drop_down,Skill,ToolsSkillsCategory
 import re
 import json
 import logging
@@ -24,16 +24,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-# ----------------------
-# ✅ Forgot Password
-# ----------------------
+
+# Forgot Password
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
-
-# ----------------------
-# ✅ Reset Password
-# ----------------------
+# Reset Password
 class ResetPasswordSerializer(serializers.Serializer):
     token = serializers.CharField()
     password = serializers.CharField(write_only=True, validators=[validate_password])
@@ -91,14 +87,35 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
 
 
 class PortfolioSerializer(serializers.ModelSerializer):
-
-    
     class Meta:
         model = Portfolio
         fields = '__all__'
         # Remove 'user' from fields to avoid circular reference
 
+#Drop Down Serilizers
+class JobPositionserializers(serializers.ModelSerializer):
+      class Meta:
+        model = JobPosition
+        fields = ['id', 'title']
 
+class Skills_serializers(serializers.ModelSerializer):
+    class Meta :
+        model = Skill
+        fields = '__all__'
+
+class Tools_Skills_serializers(serializers.ModelSerializer):
+    
+    class Meta:
+        model = ToolsSkillsCategory
+        fields = '__all__'
+    skills = Skills_serializers(many=True)
+
+class  Service_drop_down_serializers(serializers.ModelSerializer):
+    class Meta :
+        model = Service_drop_down
+        fields = '__all__'
+
+#User profile Serilizers
 class UserProfileSerializer(serializers.ModelSerializer):
     # Related nested fields
     social_links = SocialLinkSerializer(many=True, read_only=True)
@@ -189,7 +206,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data):
-        # ✅ Direct field updates
+        # Direct field updates
         for field in ['first_name', 'last_name', 'bio', 'primary_tools', 'technical_skills',
                       'soft_skills', 'skills_description', 'video_description', 'mobile']:
             if field in validated_data:
@@ -203,7 +220,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
         instance.save()
 
-        # ✅ Process work_experiences
+        # Process work_experiences
         if self.work_experiences_data:
             try:
                 for exp in json.loads(self.work_experiences_data):
@@ -218,7 +235,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             except Exception as e:
                 print(f"Experience Error: {e}")
 
-        # ✅ Process portfolio data
+        # Process portfolio data
         if self.portfolio_data:
             try:
                 for i, proj in enumerate(json.loads(self.portfolio_data)):
@@ -233,7 +250,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             except Exception as e:
                 print(f"Portfolio Error: {e}")
 
-        # ✅ Process certifications
+        # Process certifications
         cert_data = {
             'name': validated_data.pop('certifications_name', None),
             'issuer': validated_data.pop('certifications_issuer', None),
@@ -254,7 +271,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 certifications_image_url=cert_data['image']
             )
 
-        # ✅ Process services
+        # Process services
         # Process service category data
         categories_data = getattr(self, 'categories_data', [])
         print("📦 Raw categories_data:", categories_data)
@@ -263,9 +280,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if isinstance(categories_data, str):
             try:
                 categories_data = json.loads(categories_data)
-                print("✅ Parsed categories_data:", categories_data)
+                print("Parsed categories_data:", categories_data)
             except json.JSONDecodeError as e:
-                print("❌ JSON decode error:", e)
+                print(" JSON decode error:", e)
                 categories_data = []
 
         if isinstance(categories_data, list):
@@ -280,13 +297,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
                             rate_range=category.get('rate_range', ''),
                             availability=category.get('availability', '')
                         )
-                        print(f"✅ Saved ServiceCategory ID: {sc.id}")
+                        print(f"Saved ServiceCategory ID: {sc.id}")
                     except Exception as e:
-                        print(f"❌ Failed to save category: {e}")
+                        print(f"Failed to save category: {e}")
                 else:
-                    print("⚠️ Skipped non-dict item.")
+                    print(" Skipped non-dict item.")
         else:
-            print("⚠️ categories_data is not a list even after parsing.")
+            print("categories_data is not a list even after parsing.")
 
         instance.username = validated_data.get('username', instance.username)
         instance.email = validated_data.get('email', instance.email)
@@ -299,7 +316,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 
-
+#request password serlizers
 class RequestPasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
@@ -334,7 +351,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             
         return value
 
-
+#profile share serilizers
 class ProfileShareSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProfileShare

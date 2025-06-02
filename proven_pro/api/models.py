@@ -243,3 +243,48 @@ def handle_verification_status_change(sender, instance, **kwargs):
             instance.send_verification_status_email('address', instance.address_verified)
 
 
+
+
+
+#dropdown models:
+class Service_drop_down(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+
+class JobPosition(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.title
+
+
+class ToolsSkillsCategory(models.Model):
+    """
+    Represents categories like Primary Skills, Technical Skills, Soft Skills
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)  # e.g., "Primary Skills"
+
+    def __str__(self):
+        return self.name
+
+
+class Skill(models.Model):
+    """
+    Actual skills under a category
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)  # e.g., "Python"
+    category = models.ForeignKey(ToolsSkillsCategory, on_delete=models.CASCADE, related_name='skills')
+
+    def __str__(self):
+        return f"{self.name} ({self.category.name})"
+
+
+
+

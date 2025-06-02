@@ -5,9 +5,9 @@ from rest_framework import viewsets, permissions, status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
-from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
+from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers
 import json , os
-from .models import Review, ProfileShare
+from .models import Review, ProfileShare,Service_drop_down,JobPosition,ToolsSkillsCategory,Skill
 from django.conf import settings
 from django.utils import timezone
 import uuid
@@ -32,7 +32,7 @@ def health_check(request):
 
 # Correct full path to JSON file inside your app folder
 json_file_path = os.path.join(settings.BASE_DIR, 'api', 'profile_fields.json')
-print(json_file_path,"asdgiuagsiudysa")
+
 with open(json_file_path) as file:
     profile_fields = json.load(file)
     SUBSCRIPTION_FIELDS = profile_fields["SUBSCRIPTION_FIELDS"]
@@ -100,6 +100,37 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+
+class DropdownAPIView(APIView):
+    def get(self, request):
+        dropdown_type = request.query_params.get('type')
+        category_filter = request.query_params.get('category')  # e.g. "Primary Skills"
+
+        if dropdown_type == 'services':
+            data = Service_drop_down.objects.all()
+            serializer = Service_drop_down_serializers(data, many=True)
+            return Response(serializer.data)
+
+        elif dropdown_type == 'jobpositions':
+            data = JobPosition.objects.all()
+            serializer = JobPositionserializers(data, many=True)
+            return Response(serializer.data)
+
+        elif dropdown_type == 'skills':
+            if category_filter:
+                try:
+                    category = ToolsSkillsCategory.objects.get(name__iexact=category_filter)
+                    serializer = Tools_Skills_serializers(category)
+                    return Response(serializer.data)
+                except ToolsSkillsCategory.DoesNotExist:
+                    return Response({'detail': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                data = ToolsSkillsCategory.objects.prefetch_related('skills').all()
+                serializer = Tools_Skills_serializers(data, many=True)
+                return Response(serializer.data)
+
+        return Response({'detail': 'Invalid type'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserSearchFilterView(APIView):
