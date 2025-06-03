@@ -24,6 +24,7 @@ from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 import logging
+from django.shortcuts import get_object_or_404
 
 Users = get_user_model()
 
@@ -43,21 +44,20 @@ class UserProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        user = request.user
-        
-        # Serialize the user with all related data
-        serializer = UserProfileSerializer(user)
-        
-        # Return the complete serialized data without filtering
-        return Response(serializer.data)
+    def get(self, request, user_id):
+        try:
+            user = Users.objects.get(id=user_id)
+            serializer = UserProfileSerializer(user)
+            return Response(serializer.data)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request):
         user = request.user
         # Handle file uploads and data separately
         data = {}
         files = {}
-        
+    
         # Safely extract data fields
         for key in request.data:
             if key in request.FILES:
