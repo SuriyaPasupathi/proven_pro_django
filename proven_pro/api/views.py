@@ -41,7 +41,7 @@ with open(json_file_path) as file:
 
 class UserProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
         try:
