@@ -51,7 +51,7 @@ urlpatterns = [
     path('submit-profile-review/', submit_profile_review.as_view(), name='submit-profile-review'),
     
     path('profile/', UserProfileView.as_view(), name='user-profile'),
-    path('profile/<int:user_id>/', UserProfileView.as_view(), name='user-profile-by-id'),
+    path('profile/<uuid:user_id>/', UserProfileView.as_view(), name='user-profile-by-id'),
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
     # Updated subscription endpoints
