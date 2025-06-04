@@ -187,6 +187,7 @@ class profile_share_actions(APIView):
 
     def get(self, request):
         action = request.query_params.get('action')
+        user_id = request.query_params.get('user_id')
 
         # 1. Verify Profile via Share Token
         if action == 'verify':
@@ -207,9 +208,15 @@ class profile_share_actions(APIView):
             except (ProfileShare.DoesNotExist, ValueError, TypeError):
                 return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
 
-        # 3. Get All Reviews for Current User
+        # 3. Get All Reviews for Specific User (user_id-based)
         elif action == 'get_reviews':
-            user = request.user
+            if not user_id:
+                return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                user = Users.objects.get(id=user_id)
+            except Users.DoesNotExist:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
             reviews = Review.objects.filter(user=user).order_by('-created_at')
             serializer = ReviewSerializer(reviews, many=True)
             return Response(serializer.data)
@@ -218,12 +225,19 @@ class profile_share_actions(APIView):
 
     def post(self, request):
         action = request.data.get('action')
+        user_id = request.data.get('user_id')
 
-        # 2. Generate Profile Share Link and Send Email
+        # 2. Generate Profile Share Link and Send Email (user_id-based)
         if action == 'generate':
-            user = request.user
-            recipient_email = request.data.get('email')
+            if not user_id:
+                return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+            try:
+                user = Users.objects.get(id=user_id)
+            except Users.DoesNotExist:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            recipient_email = request.data.get('email')
             if not recipient_email:
                 return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -262,8 +276,9 @@ class profile_share_actions(APIView):
                 }, status=status.HTTP_201_CREATED)
 
         return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+
 class submit_profile_review(APIView):
-    permission_classes = [AllowAny]  # Or use custom token-based auth if needed
+    permission_classes = [AllowAny]  # Public access via token
 
     def post(self, request):
         token = request.data.get('share_token')
@@ -273,6 +288,7 @@ class submit_profile_review(APIView):
             if not share.is_valid():
                 return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Get user from the share object (user_id is internal)
             review_data = {
                 'user': share.user.id,
                 'reviewer_name': request.data.get('reviewer_name'),
@@ -300,7 +316,6 @@ class submit_profile_review(APIView):
         except Exception as e:
             logger.error(f"Error submitting review: {str(e)}")
             return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class CheckProfileStatusView(APIView):
     permission_classes = [IsAuthenticated]
@@ -438,28 +453,36 @@ class RequestMobileVerificationView(APIView):
 
 class VerifyMobileOTPView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')  # Get user ID from query params
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)  # Replace with your actual user model
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         otp = request.data.get('otp')
-        
+
         stored_otp = request.session.get('mobile_otp')
         mobile_to_verify = request.session.get('mobile_to_verify')
-        
+
         if not stored_otp or not mobile_to_verify:
             return Response({'error': 'No verification in progress'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         if otp != stored_otp:
             return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         # Verify the mobile number
         user.mobile_verified = True
         user.save()
-        
+
         # Clear session data
         del request.session['mobile_otp']
         del request.session['mobile_to_verify']
-        
+
         return Response({
             'message': 'Mobile number verified successfully',
             'verification_status': user.verification_status
@@ -469,8 +492,12 @@ class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        user = request.user
-        return Response({
+        user = request.query_params.get('user_id')  # Get user ID from query params
+        if not user:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        else :
+            return Response({
             'verification_status': user.verification_status,
             'gov_id_verified': user.gov_id_verified,
             'address_verified': user.address_verified,
