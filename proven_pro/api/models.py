@@ -28,6 +28,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 
 class Users(AbstractUser):
+
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     temp_email = models.EmailField(blank=True, null=True)  # Used for email change OTP
@@ -93,7 +95,6 @@ class Users(AbstractUser):
         super().save(*args, **kwargs)
 
     def generate_share_link(self, recipient_email, expires_in_days=1):
-        from api.models import ProfileShare
         share = ProfileShare.objects.create(
             user=self,
             recipient_email=recipient_email,
