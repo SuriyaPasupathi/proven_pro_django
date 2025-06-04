@@ -94,7 +94,15 @@ class UserProfileView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')  # get from query param
+        if not user_id:
+            return Response({"error": "user_id query parameter is required"}, status=400)
+
+        try:
+            user = Users.objects.get(id=user_id)  # use your custom user model here
+        except Users.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
