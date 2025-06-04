@@ -363,27 +363,33 @@ class CheckProfileStatusView(APIView):
 class UploadVerificationDocumentView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-    
+
     def post(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')  # Get user ID from query params
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)  # Replace with your actual user model
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         doc_type = request.data.get('document_type')
-        
         if not doc_type or doc_type not in ['gov_id', 'address']:
             return Response({'error': 'Invalid document type'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         if 'document' not in request.FILES:
             return Response({'error': 'No document provided'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         document = request.FILES['document']
-        
+
         if doc_type == 'gov_id':
             user.gov_id_document = document
         elif doc_type == 'address':
             user.address_document = document
-            
+
         user.save()
-        
-        # Return updated verification status
+
         return Response({
             'message': f'{doc_type.replace("_", " ").title()} document uploaded successfully',
             'verification_status': user.verification_status
