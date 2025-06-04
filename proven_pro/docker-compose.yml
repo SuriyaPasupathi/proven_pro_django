@@ -10,23 +10,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=1
-      - DB_ENGINE=django.db.backends.mysql
-      - DB_NAME=proven_django
-      - DB_USER=root
-      - DB_PASSWORD=1234
-      - DB_HOST=localhost
-      - DB_PORT=3306
-      - SECRET_KEY='django-insecure-#*mj14g=sspa-*0b^7$$8^eax7%b5zn!_q+hl4rd=w^vc%u5bx'
-      - EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-      - EMAIL_HOST=smtp.gmail.com
-      - EMAIL_PORT=587
-      - EMAIL_USE_TLS=True
-      - EMAIL_HOST_USER=pavimohan0105@gmail.com
-      - EMAIL_HOST_PASSWORD=dyjw wsuu rguq xlhc
-      - DEFAULT_FROM_EMAIL=pavimohan0105@gmail.com
-      - EMAIL_TIMEOUT=30
-      - FRONTEND_URL=http://localhost:5173
+      - .env
     depends_on:
       - db
       - redis
@@ -36,10 +20,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     environment:
-      - MYSQL_DATABASE=proven_pro_db
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=1234
-      - MYSQL_ROOT_PASSWORD=1234
+      - .env
     ports:
       - "3306:3306"
 
