@@ -1,36 +1,39 @@
 version: '3.8'
 
 services:
+  db1:
+    image: mysql:8
+    expose:
+      - 3306
+    ports:
+      - "3306:3307" 
+    environment:
+      
+      MYSQL_DATABASE: 'venkat_proven_pro'
+      MYSQL_USER: 'root'
+      MYSQL_PORT: '3306'
+      DB_HOST: 'db1'
+      # MYSQL_PASSWORD: '1234'
+      MYSQL_ROOT_PASSWORD: '1234'
+
   web:
     build: .
-    command: gunicorn proven_pro.wsgi:application --bind 0.0.0.0:8000
+    image: proven_pro
     volumes:
       - .:/app
-      - ./media:/app/media
     ports:
       - "8000:8000"
-    environment:
-      - .env
     depends_on:
-      - db
-      - redis
-
-  db:
-    image: mysql:8.0
-    volumes:
-      - mysql_data:/var/lib/mysql
-    environment:
-      - .env
-    ports:
-      - "3306:3306"
-
-  redis:
-    image: redis:7.0
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-volumes:
-  mysql_data:
-  redis_data:
+      - db1
+    links:
+      - db1
+    command:
+      - /bin/bash
+      - -c
+      - |
+        sleep 10
+        python3 manage.py makemigrations
+        python3 manage.py makemigrations app/
+        python3 manage.py migrate
+        python3 manage.py migrate app/
+        python3 manage.py runserver 0.0.0.0:8000
