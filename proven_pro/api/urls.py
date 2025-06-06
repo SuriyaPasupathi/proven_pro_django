@@ -34,7 +34,7 @@ router.register(r'register', RegisterViewSet, basename='otp')
 
 urlpatterns = [
     path('health_check', health_check, name='health_check'),
-    path('dropdown/',DropdownAPIView.as_view,name='dropdown'),
+    path('dropdown/',DropdownAPIView.as_view(),name='dropdown'),
     #auth
     path('google-auth/', google_auth.as_view(), name='google-auth'),
     path('login/', LoginView.as_view(), name='login'),
