@@ -11,7 +11,7 @@ admin.site.index_title = "Welcome to Proven Pro Admin Portal"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-]
+]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Serve media files during development
 if settings.DEBUG:

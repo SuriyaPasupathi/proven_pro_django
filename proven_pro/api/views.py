@@ -492,12 +492,16 @@ class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        user = request.query_params.get('user_id')  # Get user ID from query params
-        if not user:
+        user_id = request.query_params.get('user_id')
+        if not user_id:
             return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        else :
-            return Response({
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
             'verification_status': user.verification_status,
             'gov_id_verified': user.gov_id_verified,
             'address_verified': user.address_verified,
