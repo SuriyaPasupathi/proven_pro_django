@@ -93,21 +93,37 @@ class UserProfileView(APIView):
             print("Serializer errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request):
-        user_id = request.query_params.get('user_id')  # get from query param
-        if not user_id:
-            return Response({"error": "user_id query parameter is required"}, status=400)
-
+    def put(self, request, user_id):
         try:
-            user = Users.objects.get(id=user_id)  # use your custom user model here
+            user = Users.objects.get(id=user_id)  # get user by ID from URL
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
-        serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        # Handle file uploads and data separately
+        data = {}
+        files = {}
+
+        for key in request.data:
+            if key in request.FILES:
+                files[key] = request.FILES[key]
+            else:
+                data[key] = request.data[key]
+
+        # Combine data and files
+        serializer_data = data.copy()
+        serializer_data.update(files)
+
+        # Use partial=True for partial updates
+        serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
+
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
+            return Response({
+                "message": "Profile updated successfully",
+                "data": UserProfileSerializer(user).data
+            })
+        else:
+            return Response(serializer.errors, status=400)
 
 
 class DropdownAPIView(APIView):
