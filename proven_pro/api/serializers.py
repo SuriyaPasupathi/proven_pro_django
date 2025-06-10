@@ -89,7 +89,7 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
 class PortfolioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Portfolio
-        fields = '__all__'
+        fields = ['user','project_title','project_description','project_url','project_image']
         # Remove 'user' from fields to avoid circular reference
 
 #Drop Down Serilizers
