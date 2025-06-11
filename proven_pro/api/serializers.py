@@ -75,7 +75,7 @@ class CertificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Certification
         fields = ('id', 'certifications_name', 'certifications_issuer', 'certifications_issued_date', 'certifications_expiration_date', 'certifications_id', 
-                  'certifications_image_url')
+                  'certifications_image_url','certifications_image')
         # Remove 'user' from fields  to avoid circular reference
 
 
@@ -125,40 +125,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
     categories = ServiceCategorySerializer(many=True, read_only=True)
     projects = PortfolioSerializer(many=True, read_only=True)
 
-    # Write-only direct create fields
+    # Write-only input fields
     work_experiences = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
-    facebook = serializers.URLField(write_only=True, required=False, allow_blank=True)
-    twitter = serializers.URLField(write_only=True, required=False, allow_blank=True)
-    
-    # Experience fields
-    company_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    position = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    experience_start_date = serializers.DateField(write_only=True, required=False)
-    experience_end_date = serializers.DateField(write_only=True, required=False)
-    key_responsibilities = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    
-    # Project fields
-    project_title = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    project_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    project_url = serializers.URLField(write_only=True, required=False, allow_blank=True)
-    project_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    
-    # Certification fields
-    certifications_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    certifications_issuer = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    certifications_issued_date = serializers.DateField(write_only=True, required=False)
-    certifications_expiration_date = serializers.DateField(write_only=True, required=False, allow_null=True)
-    certifications_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    certifications_image = serializers.ImageField(write_only=True, required=False)
+    portfolio = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    certifications_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    categories_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    # Service category
-    services_categories = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    services_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    rate_range = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    availability = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    deleted_experience_ids = serializers.CharField(write_only=True, required=False)
+    deleted_certification_ids = serializers.CharField(write_only=True, required=False)
+    deleted_project_ids = serializers.CharField(write_only=True, required=False)
+    deleted_category_ids = serializers.CharField(write_only=True, required=False)
 
-    # Media Fields
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
@@ -166,24 +143,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Users
-        fields = (
-            'id', 'username', 'email', 'subscription_type', 'subscription_active',
-            'subscription_start_date', 'subscription_end_date',
-            'first_name', 'last_name', 'bio',
-            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
-            'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail', 'mobile',
-            'social_links', 'client_reviews', 'experiences', 'certifications', 'categories', 'projects',
-            'video_intro', 'video_intro_url', 'video_description',
-            'linkedin', 'facebook', 'twitter',
-            'work_experiences', 'company_name', 'position', 'experience_start_date', 
-            'experience_end_date', 'key_responsibilities',
-            'project_title', 'project_description', 'project_url', 'project_image',
-            'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
-            'certifications_expiration_date', 'certifications_id', 'certifications_image',
-            'services_categories', 'services_description', 'rate_range', 'availability',
-            'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
-            'mobile_verified', 'verification_status',
-        )
+        fields = '__all__'
 
     def get_profile_pic_url(self, obj):
         return obj.profile_pic.url if obj.profile_pic else None
@@ -206,7 +166,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data):
-        # Direct field updates
         for field in ['first_name', 'last_name', 'bio', 'primary_tools', 'technical_skills',
                       'soft_skills', 'skills_description', 'video_description', 'mobile']:
             if field in validated_data:
@@ -214,60 +173,113 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
         if 'profile_pic' in validated_data:
             instance.profile_pic = validated_data['profile_pic']
-
         if 'video_intro' in validated_data:
             instance.video_intro = validated_data['video_intro']
 
-        instance.save()
+            instance.save()
 
-        # Process work_experiences
+        # Handle Experiences
         if self.work_experiences_data:
             try:
                 for exp in json.loads(self.work_experiences_data):
-                    Experiences.objects.create(
-                        user=instance,
-                        company_name=exp.get('company_name', ''),
-                        position=exp.get('position', ''),
-                        experience_start_date=exp.get('experience_start_date'),
-                        experience_end_date=exp.get('experience_end_date'),
-                        key_responsibilities=exp.get('key_responsibilities', '')
-                    )
+                    exp_id = exp.get("id")
+                    if exp_id:
+                        Experiences.objects.filter(id=exp_id, user=instance).update(
+                            company_name=exp.get('company_name', ''),
+                            position=exp.get('position', ''),
+                            experience_start_date=exp.get('experience_start_date'),
+                            experience_end_date=exp.get('experience_end_date'),
+                            key_responsibilities=exp.get('key_responsibilities', '')
+                        )
+                    else:
+                        Experiences.objects.create(
+                            user=instance,
+                            company_name=exp.get('company_name', ''),
+                            position=exp.get('position', ''),
+                            experience_start_date=exp.get('experience_start_date'),
+                            experience_end_date=exp.get('experience_end_date'),
+                            key_responsibilities=exp.get('key_responsibilities', '')
+                        )
             except Exception as e:
                 print(f"Experience Error: {e}")
 
-        # Process portfolio
+        deleted_exp_ids = self.initial_data.get('deleted_experience_ids', [])
+        if isinstance(deleted_exp_ids, str):
+            try:
+                deleted_exp_ids = json.loads(deleted_exp_ids)
+            except json.JSONDecodeError:
+                deleted_exp_ids = []
+        Experiences.objects.filter(id__in=deleted_exp_ids, user=instance).delete()
+
+        # Handle Portfolio
         if self.portfolio_data:
             try:
                 for i, proj in enumerate(json.loads(self.portfolio_data)):
-                    project_image = self.project_images.get(str(i))
-                    Portfolio.objects.create(
-                        user=instance,
-                        project_title=proj.get('project_title', ''),
-                        project_description=proj.get('project_description', ''),
-                        project_url=proj.get('project_url', ''),
-                        project_image=project_image
-                    )
+                    project_id = proj.get("id")
+                    image_file = self.project_images.get(str(i))
+                    if project_id:
+                        Portfolio.objects.filter(id=project_id, user=instance).update(
+                            project_title=proj.get('project_title', ''),
+                            project_description=proj.get('project_description', ''),
+                            project_url=proj.get('project_url', ''),
+                            project_image=image_file if image_file else ('project_image')
+                        )
+                    else:
+                        Portfolio.objects.create(
+                            user=instance,
+                            project_title=proj.get('project_title', ''),
+                            project_description=proj.get('project_description', ''),
+                            project_url=proj.get('project_url', ''),
+                            project_image=image_file
+                        )
             except Exception as e:
                 print(f"Portfolio Error: {e}")
 
-        # Process certifications
+        deleted_proj_ids = self.initial_data.get('deleted_project_ids', [])
+        if isinstance(deleted_proj_ids, str):
+            try:
+                deleted_proj_ids = json.loads(deleted_proj_ids)
+            except json.JSONDecodeError:
+                deleted_proj_ids = []
+        Portfolio.objects.filter(id__in=deleted_proj_ids, user=instance).delete()
+
+        # Handle Certifications
         if self.certifications_data:
             try:
                 for cert in json.loads(self.certifications_data):
-                    Certification.objects.create(
-                        user=instance,
-                        certifications_name=cert.get('certifications_name', ''),
-                        certifications_issuer=cert.get('certifications_issuer', ''),
-                        certifications_issued_date=cert.get('certifications_issued_date'),
-                        certifications_expiration_date=cert.get('certifications_expiration_date'),
-                        certifications_id=cert.get('certifications_id', ''),
-                        certifications_image_url=cert.get('certifications_image_url', '')  # or remove if not needed
-                    )
+                    cert_id = cert.get("id")
+                    if cert_id:
+                        Certification.objects.filter(id=cert_id, user=instance).update(
+                            certifications_name=cert.get('certifications_name', ''),
+                            certifications_issuer=cert.get('certifications_issuer', ''),
+                            certifications_issued_date=cert.get('certifications_issued_date'),
+                            certifications_expiration_date=cert.get('certifications_expiration_date'),
+                            certifications_id=cert.get('certifications_id', ''),
+                            certifications_image=image_file if image_file else ('certifications_image')
+                        )
+                    else:
+                        Certification.objects.create(
+                            user=instance,
+                            certifications_name=cert.get('certifications_name', ''),
+                            certifications_issuer=cert.get('certifications_issuer', ''),
+                            certifications_issued_date=cert.get('certifications_issued_date'),
+                            certifications_expiration_date=cert.get('certifications_expiration_date'),
+                            certifications_id=cert.get('certifications_id', ''),
+                            certifications_image= image_file
+                        )
             except Exception as e:
                 print(f"Certification Error: {e}")
 
-        # Process service categories
-        categories_data = getattr(self, 'categories_data', [])
+        deleted_cert_ids = self.initial_data.get('deleted_certification_ids', [])
+        if isinstance(deleted_cert_ids, str):
+            try:
+                deleted_cert_ids = json.loads(deleted_cert_ids)
+            except json.JSONDecodeError:
+                deleted_cert_ids = []
+        Certification.objects.filter(id__in=deleted_cert_ids, user=instance).delete()
+
+        # Handle Categories
+        categories_data = self.categories_data
         if isinstance(categories_data, str):
             try:
                 categories_data = json.loads(categories_data)
@@ -275,24 +287,34 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 categories_data = []
 
         if isinstance(categories_data, list):
-            for category in categories_data:
-                if isinstance(category, dict):
-                    try:
+            for cat in categories_data:
+                try:
+                    cat_id = cat.get("id")
+                    if cat_id:
+                        ServiceCategory.objects.filter(id=cat_id, user=instance).update(
+                            services_categories=cat.get('services_categories', ''),
+                            services_description=cat.get('services_description', ''),
+                            rate_range=cat.get('rate_range', ''),
+                            availability=cat.get('availability', '')
+                        )
+                    else:
                         ServiceCategory.objects.create(
                             user=instance,
-                            services_categories=category.get('services_categories', ''),
-                            services_description=category.get('services_description', ''),
-                            rate_range=category.get('rate_range', ''),
-                            availability=category.get('availability', '')
+                            services_categories=cat.get('services_categories', ''),
+                            services_description=cat.get('services_description', ''),
+                            rate_range=cat.get('rate_range', ''),
+                            availability=cat.get('availability', '')
                         )
-                    except Exception as e:
-                        print(f"Category Error: {e}")
+                except Exception as e:
+                    print(f"Category Error: {e}")
 
-        instance.username = validated_data.get('username', instance.username)
-        instance.email = validated_data.get('email', instance.email)
-        instance.first_name = validated_data.get('first_name', instance.first_name)
-        instance.last_name = validated_data.get('last_name', instance.last_name)
-        instance.save()
+        deleted_cat_ids = self.initial_data.get('deleted_category_ids', [])
+        if isinstance(deleted_cat_ids, str):
+            try:
+                deleted_cat_ids = json.loads(deleted_cat_ids)
+            except json.JSONDecodeError:
+                deleted_cat_ids = []
+        ServiceCategory.objects.filter(id__in=deleted_cat_ids, user=instance).delete()
 
         return instance
 

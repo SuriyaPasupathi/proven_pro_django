@@ -41,77 +41,40 @@ with open(json_file_path) as file:
     URL_FIELDS = profile_fields["URL_FIELDS"] 
 
 class UserProfileView(APIView):
-    # parser_classes = (MultiPartParser, FormParser, JSONParser)
-    # permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
-        user_id = kwargs.get('user_id')
-        try:
-            user = Users.objects.get(id=user_id)
+    def get(self, request, user_id=None):
+        if user_id:
+            user = get_object_or_404(Users, id=user_id)
             serializer = UserProfileSerializer(user)
-            return Response(serializer.data)
-        except Users.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            users = Users.objects.all()
+            serializer = UserProfileSerializer(users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         user = request.user
-        data = {}
-        files = {}
-
-        for key in request.data:
-            if key in request.FILES:
-                files[key] = request.FILES[key]
-            else:
-                data[key] = request.data[key]
-
-        print("Received data:", data)
-        print("Received files keys:", files.keys())
-
-        serializer_data = data.copy()
-        for key, value in files.items():
-            serializer_data[key] = value
-
-        serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
-
+        serializer = UserProfileSerializer(user, data=request.data, context={'request': request}, partial=True)
         if serializer.is_valid():
-            print("Serializer validated_data:", serializer.validated_data)
             serializer.save()
-            return Response({
-                "message": "Profile updated successfully",
-                "data": UserProfileSerializer(user).data
-            })
-        else:
-            print("Serializer errors:", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request):
-        user_id = request.query_params.get('user_id')  # get from query param
-        if not user_id:
-            return Response({"error": "user_id query parameter is required"}, status=400)
-
-        try:
-            user = Users.objects.get(id=user_id)  # use your custom user model here
-        except Users.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
-
+    def put(self, request, user_id):
+        user = get_object_or_404(Users, id=user_id)
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
-    def delete(self, request):
-        user_id = request.query_params.get('user_id')
-        if not user_id:
-            return Response({"error": "user_id query parameter is required"}, status=400)
-
-        try:
-            user = Users.objects.get(id=user_id)
-        except Users.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
-
+    def delete(self, request, user_id):
+        user = get_object_or_404(Users, id=user_id)
         user.delete()
-        return Response({"message": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+    
 
 class DropdownAPIView(APIView):
     def get(self, request):
