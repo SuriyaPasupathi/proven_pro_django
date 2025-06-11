@@ -404,4 +404,16 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'projects'
         ]
 
+class UsersearchSerializer(serializers.ModelSerializer):
+    description = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Users
+        fields = ('id', 'username', 'description', 'rating')
+
+    def get_description(self, obj):
+        return obj.bio or "N/A"
+
+    def get_rating(self, obj):
+        return obj.max_individual_rating or 0
