@@ -44,16 +44,17 @@ with open(json_file_path) as file:
     URL_FIELDS = profile_fields["URL_FIELDS"] 
 
 class UserProfileView(APIView):
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
-    permission_classes = [IsAuthenticated]
+    # parser_classes = (MultiPartParser, FormParser, JSONParser)
+    # permission_classes = [IsAuthenticated]
 
-    def get(self, request, user_id):
+    def get(self, request, *args, **kwargs):
+        user_id = kwargs.get('user_id')
         try:
             user = Users.objects.get(id=user_id)
             serializer = UserProfileSerializer(user)
             return Response(serializer.data)
         except Users.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'User not found'}, status=404)
 
     def post(self, request):
         user = request.user
@@ -242,6 +243,7 @@ class profile_share_actions(APIView):
         if action == 'generate':
             if not user_id:
                 return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
 
             try:
                 user = Users.objects.get(id=user_id)

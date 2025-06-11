@@ -89,7 +89,7 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
 class PortfolioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Portfolio
-        fields = ['user','project_title','project_description','project_url','project_image']
+        fields = ['id','user','project_title','project_description','project_url','project_image']
         # Remove 'user' from fields to avoid circular reference
 
 #Drop Down Serilizers
@@ -235,7 +235,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             except Exception as e:
                 print(f"Experience Error: {e}")
 
-        # Process portfolio data
+        # Process portfolio
         if self.portfolio_data:
             try:
                 for i, proj in enumerate(json.loads(self.portfolio_data)):
@@ -251,59 +251,42 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 print(f"Portfolio Error: {e}")
 
         # Process certifications
-        cert_data = {
-            'name': validated_data.pop('certifications_name', None),
-            'issuer': validated_data.pop('certifications_issuer', None),
-            'issued': validated_data.pop('certifications_issued_date', None),
-            'expire': validated_data.pop('certifications_expiration_date', None),
-            'cert_id': validated_data.pop('certifications_id', None),
-            'image': validated_data.pop('certifications_image', None),
-        }
+        if self.certifications_data:
+            try:
+                for cert in json.loads(self.certifications_data):
+                    Certification.objects.create(
+                        user=instance,
+                        certifications_name=cert.get('certifications_name', ''),
+                        certifications_issuer=cert.get('certifications_issuer', ''),
+                        certifications_issued_date=cert.get('certifications_issued_date'),
+                        certifications_expiration_date=cert.get('certifications_expiration_date'),
+                        certifications_id=cert.get('certifications_id', ''),
+                        certifications_image_url=cert.get('certifications_image_url', '')  # or remove if not needed
+                    )
+            except Exception as e:
+                print(f"Certification Error: {e}")
 
-        if cert_data['name']:
-            Certification.objects.create(
-                user=instance,
-                certifications_name=cert_data['name'],
-                certifications_issuer=cert_data['issuer'],
-                certifications_issued_date=cert_data['issued'],
-                certifications_expiration_date=cert_data['expire'],
-                certifications_id=cert_data['cert_id'],
-                certifications_image_url=cert_data['image']
-            )
-
-        # Process services
-        # Process service category data
+        # Process service categories
         categories_data = getattr(self, 'categories_data', [])
-        print("📦 Raw categories_data:", categories_data)
-
-        # Convert from string to list if needed
         if isinstance(categories_data, str):
             try:
                 categories_data = json.loads(categories_data)
-                print("Parsed categories_data:", categories_data)
-            except json.JSONDecodeError as e:
-                print(" JSON decode error:", e)
+            except json.JSONDecodeError:
                 categories_data = []
 
         if isinstance(categories_data, list):
-            for idx, category in enumerate(categories_data):
-                print(f"🔍 Processing category {idx + 1}: {category}")
+            for category in categories_data:
                 if isinstance(category, dict):
                     try:
-                        sc = ServiceCategory.objects.create(
+                        ServiceCategory.objects.create(
                             user=instance,
                             services_categories=category.get('services_categories', ''),
                             services_description=category.get('services_description', ''),
                             rate_range=category.get('rate_range', ''),
                             availability=category.get('availability', '')
                         )
-                        print(f"Saved ServiceCategory ID: {sc.id}")
                     except Exception as e:
-                        print(f"Failed to save category: {e}")
-                else:
-                    print(" Skipped non-dict item.")
-        else:
-            print("categories_data is not a list even after parsing.")
+                        print(f"Category Error: {e}")
 
         instance.username = validated_data.get('username', instance.username)
         instance.email = validated_data.get('email', instance.email)
