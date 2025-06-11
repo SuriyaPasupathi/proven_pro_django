@@ -23,7 +23,9 @@ from .views import (
     CheckProfileStatusView,
     profile_share_actions,
     submit_profile_review,
-    DropdownAPIView
+    DropdownAPIView,
+    SkillsDropdownAPIView,
+    UsersearchApiview
     
 
 )
@@ -34,9 +36,10 @@ router.register(r'register', RegisterViewSet, basename='otp')
 
 urlpatterns = [
     path('health_check', health_check, name='health_check'),
-
-   
+     
+    path('users-search/', UsersearchApiview.as_view(), name='highest-rated-users-api'),
     path('dropdown/', DropdownAPIView.as_view(), name='dropdown'),
+    path('skills-dropdown/', SkillsDropdownAPIView.as_view(), name='skills-dropdown'),
     #auth
     path('google-auth/', google_auth.as_view(), name='google-auth'),
     path('login/', LoginView.as_view(), name='login'),

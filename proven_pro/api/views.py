@@ -5,7 +5,7 @@ from rest_framework import viewsets, permissions, status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
-from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers
+from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers, UsersearchSerializer
 import json , os
 from .models import Review, ProfileShare,Service_drop_down,JobPosition,ToolsSkillsCategory,Skill
 from django.conf import settings
@@ -25,6 +25,9 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 import logging
 from django.shortcuts import get_object_or_404
+from rest_framework import status
+from django.db.models import Max, Count, Q, Avg
+from django.core.paginator import Paginator
 
 Users = get_user_model()
 
@@ -79,7 +82,6 @@ class UserProfileView(APIView):
 class DropdownAPIView(APIView):
     def get(self, request):
         dropdown_type = request.query_params.get('type')
-        category_filter = request.query_params.get('category')  # e.g. "Primary Skills"
 
         if dropdown_type == 'services':
             data = Service_drop_down.objects.all()
@@ -91,21 +93,28 @@ class DropdownAPIView(APIView):
             serializer = JobPositionserializers(data, many=True)
             return Response(serializer.data)
 
-        elif dropdown_type == 'skills':
-            if category_filter:
-                try:
-                    category = ToolsSkillsCategory.objects.get(name__iexact=category_filter)
-                    serializer = Tools_Skills_serializers(category)
-                    return Response(serializer.data)
-                except ToolsSkillsCategory.DoesNotExist:
-                    return Response({'detail': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                data = ToolsSkillsCategory.objects.prefetch_related('skills').all()
-                serializer = Tools_Skills_serializers(data, many=True)
-                return Response(serializer.data)
-
         return Response({'detail': 'Invalid type'}, status=status.HTTP_400_BAD_REQUEST)
 
+class SkillsDropdownAPIView(APIView):
+    def get(self, request):
+        category_filter = request.query_params.get('category')
+
+        if category_filter:
+            try:
+                category = ToolsSkillsCategory.objects.get(name__iexact=category_filter)
+                serializer = Tools_Skills_serializers(category)
+                return Response(serializer.data)
+            except ToolsSkillsCategory.DoesNotExist:
+                # Show available categories in the error response
+                categories = list(ToolsSkillsCategory.objects.values_list('name', flat=True))
+                return Response({
+                    'detail': 'Category not found',
+                    'available_categories': categories
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            data = ToolsSkillsCategory.objects.prefetch_related('skills').all()
+            serializer = Tools_Skills_serializers(data, many=True)
+            return Response(serializer.data)
 
 class UserSearchFilterView(APIView):
     permission_classes = [AllowAny]  # Change to IsAuthenticated if needed
@@ -540,6 +549,70 @@ class admin_document_approval_webhook(APIView):
             return Response({
                 'error': 'User not found'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+logger = logging.getLogger(__name__)
+
+class UsersearchApiview(APIView):
+    def get(self, request):
+        try:
+            offset = int(request.GET.get('offset', 0))
+            limit = int(request.GET.get('limit', 12))
+            search = request.GET.get('search', '').strip()
+            min_rating = int(request.GET.get('min_rating', 1))
+
+            queryset = Users.objects.prefetch_related('client_reviews').annotate(
+                max_individual_rating=Max('client_reviews__rating'),
+                total_reviews=Count('client_reviews'),
+                avg_rating=Avg('client_reviews__rating')
+            )
+
+            # ✅ Apply min_rating only if there is a rating
+            queryset = queryset.filter(
+                Q(max_individual_rating__isnull=True) | Q(max_individual_rating__gte=min_rating)
+            )
+
+            if search:
+                queryset = queryset.filter(
+                    Q(username__icontains=search) |
+                    Q(bio__icontains=search) |
+                    Q(primary_tools__icontains=search) |
+                    Q(technical_skills__icontains=search)
+                )
+
+            queryset = queryset.order_by('-max_individual_rating', '-avg_rating', '-total_reviews')
+
+            total_count = queryset.count()
+            if total_count == 0:
+                return Response({'success': True, 'data': []})
+
+            if offset >= total_count:
+                offset = offset % total_count
+
+            users = queryset[offset:offset + limit]
+            serializer = UsersearchSerializer(users, many=True)
+
+            return Response({
+                'success': True,
+                'data': serializer.data
+            })
+
+        except ValueError as e:
+            logger.error(f"ValueError in UsersearchApiview: {e}")
+            return Response({
+                'success': False,
+                'error': 'Invalid parameter values',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error in UsersearchApiview: {e}")
+            return Response({
+                'success': False,
+                'error': 'Internal server error',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 
