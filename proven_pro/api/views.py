@@ -59,11 +59,34 @@ class UserProfileView(APIView):
 
     def post(self, request):
         user = request.user
-        serializer = UserProfileSerializer(user, data=request.data, context={'request': request}, partial=True)
+        data = {}
+        files = {}
+
+        for key in request.data:
+            if key in request.FILES:
+                files[key] = request.FILES[key]
+            else:
+                data[key] = request.data[key]
+
+        print("Received data:", data)
+        print("Received files keys:", files.keys())
+
+        serializer_data = data.copy()
+        for key, value in files.items():
+            serializer_data[key] = value
+
+        serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
+
         if serializer.is_valid():
+            print("Serializer validated_data:", serializer.validated_data)
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "message": "Profile updated successfully",
+                "data": UserProfileSerializer(user).data
+            })
+        else:
+            print("Serializer errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request, user_id):
         user = get_object_or_404(Users, id=user_id)
