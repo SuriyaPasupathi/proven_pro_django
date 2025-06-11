@@ -28,8 +28,6 @@ from django.core.mail import send_mail
 from django.conf import settings
 
 class Users(AbstractUser):
-
-    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     temp_email = models.EmailField(blank=True, null=True)  # Used for email change OTP
@@ -143,6 +141,7 @@ class PendingUsers(Users):
         verbose_name_plural = 'Pending Verify Users'
 
 class Experiences(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
     company_name = models.CharField(max_length=150)
     position = models.CharField(max_length=100)
@@ -152,6 +151,7 @@ class Experiences(models.Model):
 
 
 class Certification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='certifications')
     certifications_name = models.CharField(max_length=100)
     certifications_issuer = models.CharField(max_length=100)
@@ -163,6 +163,7 @@ class Certification(models.Model):
 
 
 class ServiceCategory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='categories')
     services_categories = models.TextField(blank=True)
     services_description = models.TextField(blank=True)
@@ -171,6 +172,7 @@ class ServiceCategory(models.Model):
 
 
 class Portfolio(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
     project_title = models.CharField(max_length=100)
     project_description = models.TextField(blank=True)
