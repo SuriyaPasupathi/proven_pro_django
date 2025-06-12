@@ -202,9 +202,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         }
         self.certification_images = {
         key.split('_')[-1]: self.initial_data[key]
-        for key in self.initial_data if key.startswith('certifications_image_')
-        }
-
+        for key in self.initial_data if key.startswith('certifications_image_')}
 
         return data
 
@@ -289,7 +287,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # Handle Certifications
         if self.certifications_data:
             try:
-                for cert in json.loads(self.certifications_data):
+                for i, cert in enumerate(json.loads(self.certifications_data)):
+                    image_file = self.certification_images.get(str(i))  # <- define here
                     cert_id = cert.get("id")
                     if cert_id:
                         Certification.objects.filter(id=cert_id, user=instance).update(
@@ -299,7 +298,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                             certifications_expiration_date=cert.get('certifications_expiration_date'),
                             certifications_id=cert.get('certifications_id', ''),
                             certifications_image_url=cert.get('certifications_image_url', ''),
-                            certifications_image=image_file if image_file else ('certifications_image')
+                            certifications_image=image_file if image_file else None
                         )
                     else:
                         Certification.objects.create(
@@ -310,18 +309,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
                             certifications_expiration_date=cert.get('certifications_expiration_date'),
                             certifications_id=cert.get('certifications_id', ''),
                             certifications_image_url=cert.get('certifications_image_url', ''),
-                            certifications_image= image_file
+                            certifications_image=image_file
                         )
             except Exception as e:
                 print(f"Certification Error: {e}")
-
-        deleted_cert_ids = self.initial_data.get('deleted_certification_ids', [])
-        if isinstance(deleted_cert_ids, str):
-            try:
-                deleted_cert_ids = json.loads(deleted_cert_ids)
-            except json.JSONDecodeError:
-                deleted_cert_ids = []
-        Certification.objects.filter(id__in=deleted_cert_ids, user=instance).delete()
+            deleted_cert_ids = self.initial_data.get('deleted_certification_ids', [])
 
         # Handle Categories
         categories_data = self.categories_data
