@@ -5,7 +5,7 @@ from rest_framework import viewsets, permissions, status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
-from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers, UsersearchSerializer
+from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers, UsersearchSerializer,Experiences, Certification, ServiceCategory, Portfolio
 import json , os
 from .models import Review, ProfileShare,Service_drop_down,JobPosition,ToolsSkillsCategory,Skill
 from django.conf import settings
@@ -614,7 +614,25 @@ class UsersearchApiview(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class DeleteItemView(APIView):
+    def delete(self, request, model_name, pk):
+        model_map = {
+            'experience': Experiences,
+            'certification': Certification,
+            'category': ServiceCategory,
+            'portfolio': Portfolio
+        }
 
+        model_class = model_map.get(model_name.lower())
+        if not model_class:
+            return Response({'error': 'Invalid model name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            instance = model_class.objects.get(pk=pk)
+            instance.delete()
+            return Response({'message': f'{model_name} with ID {pk} deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except model_class.DoesNotExist:
+            return Response({'error': f'{model_name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 

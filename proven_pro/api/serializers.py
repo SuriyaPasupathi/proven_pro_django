@@ -23,8 +23,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
-
-
 # Forgot Password
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -120,22 +118,45 @@ class UserProfileSerializer(serializers.ModelSerializer):
     # Related nested fields
     social_links = SocialLinkSerializer(many=True, read_only=True)
     client_reviews = ReviewSerializer(many=True, read_only=True)
-    experiences = work_experiences_Serializer(many=True, read_only=True)
+    work_experiences = work_experiences_Serializer(many=True, read_only=True, source='experiences')
     certifications = CertificationSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
-    projects = PortfolioSerializer(many=True, read_only=True)
+    portfolio = PortfolioSerializer(many=True, read_only=True, source='projects')
 
-    # Write-only input fields
-    work_experiences = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    portfolio = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    certifications_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    categories_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # Write-only direct create fields
+    work_experiences_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
+    facebook = serializers.URLField(write_only=True, required=False, allow_blank=True)
+    twitter = serializers.URLField(write_only=True, required=False, allow_blank=True)
+    
+    # Experience fields
+    company_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    position = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    experience_start_date = serializers.DateField(write_only=True, required=False)
+    experience_end_date = serializers.DateField(write_only=True, required=False)
+    key_responsibilities = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    
+    # Project fields
+    project_title = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    project_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    project_url = serializers.URLField(write_only=True, required=False, allow_blank=True)
+    project_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
+    
+    # Certification fields
+    certifications_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    certifications_issuer = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    certifications_issued_date = serializers.DateField(write_only=True, required=False)
+    certifications_expiration_date = serializers.DateField(write_only=True, required=False, allow_null=True)
+    certifications_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    certifications_image = serializers.ImageField(write_only=True, required=False)
 
-    deleted_experience_ids = serializers.CharField(write_only=True, required=False)
-    deleted_certification_ids = serializers.CharField(write_only=True, required=False)
-    deleted_project_ids = serializers.CharField(write_only=True, required=False)
-    deleted_category_ids = serializers.CharField(write_only=True, required=False)
+    # Service category
+    services_categories = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    services_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    rate_range = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    availability = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
+    # Media Fields
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
@@ -143,7 +164,22 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Users
-        fields = '__all__'
+        fields = ('id', 'username', 'email', 'subscription_type', 'subscription_active',
+            'subscription_start_date', 'subscription_end_date',
+            'first_name', 'last_name', 'bio',
+            'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
+            'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail', 'mobile',
+            'social_links', 'client_reviews', 'work_experiences', 'certifications', 'categories', 'portfolio',
+            'video_intro', 'video_intro_url', 'video_description',
+            'linkedin', 'facebook', 'twitter',
+            'work_experiences_data', 'company_name', 'position', 'experience_start_date', 
+            'experience_end_date', 'key_responsibilities',
+            'project_title', 'project_description', 'project_url', 'project_image',
+            'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
+            'certifications_expiration_date', 'certifications_id', 'certifications_image',
+            'services_categories', 'services_description', 'rate_range', 'availability',
+            'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
+            'mobile_verified', 'verification_status')
 
     def get_profile_pic_url(self, obj):
         return obj.profile_pic.url if obj.profile_pic else None
@@ -161,6 +197,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         self.project_images = {
             key.split('_')[-1]: self.initial_data[key]
             for key in self.initial_data if key.startswith('project_image_')
+        }
+        self.certification_images = {
+            key.split('_')[-1]: self.initial_data[key]
+            for key in self.initial_data if key.startswith('certifications_image_')
         }
 
         return data
@@ -246,7 +286,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # Handle Certifications
         if self.certifications_data:
             try:
-                for cert in json.loads(self.certifications_data):
+                for i, cert in enumerate(json.loads(self.certifications_data)):
+                    image_file = self.certification_images.get(str(i))  # <- define here
                     cert_id = cert.get("id")
                     if cert_id:
                         Certification.objects.filter(id=cert_id, user=instance).update(
@@ -255,7 +296,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
                             certifications_issued_date=cert.get('certifications_issued_date'),
                             certifications_expiration_date=cert.get('certifications_expiration_date'),
                             certifications_id=cert.get('certifications_id', ''),
-                            certifications_image=image_file if image_file else ('certifications_image')
+                            certifications_image_url=cert.get('certifications_image_url', ''),
+                            certifications_image=image_file if image_file else None
                         )
                     else:
                         Certification.objects.create(
@@ -265,18 +307,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
                             certifications_issued_date=cert.get('certifications_issued_date'),
                             certifications_expiration_date=cert.get('certifications_expiration_date'),
                             certifications_id=cert.get('certifications_id', ''),
-                            certifications_image= image_file
+                            certifications_image_url=cert.get('certifications_image_url', ''),
+                            certifications_image=image_file
                         )
             except Exception as e:
                 print(f"Certification Error: {e}")
-
-        deleted_cert_ids = self.initial_data.get('deleted_certification_ids', [])
-        if isinstance(deleted_cert_ids, str):
-            try:
-                deleted_cert_ids = json.loads(deleted_cert_ids)
-            except json.JSONDecodeError:
-                deleted_cert_ids = []
-        Certification.objects.filter(id__in=deleted_cert_ids, user=instance).delete()
+           
 
         # Handle Categories
         categories_data = self.categories_data
@@ -315,6 +351,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             except json.JSONDecodeError:
                 deleted_cat_ids = []
         ServiceCategory.objects.filter(id__in=deleted_cat_ids, user=instance).delete()
+
+
+        instance.username = validated_data.get('username', instance.username)
+        instance.email = validated_data.get('email', instance.email)
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.save()
 
         return instance
 
@@ -365,9 +408,9 @@ class ProfileShareSerializer(serializers.ModelSerializer):
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
-    experiences = work_experiences_Serializer(many=True, read_only=True)
+    work_experiences = work_experiences_Serializer(many=True, read_only=True)
     certifications = CertificationSerializer(many=True, read_only=True)
-    projects = PortfolioSerializer(many=True, read_only=True)
+    portfolio = PortfolioSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
     # Add fields for reading the file URLs
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
@@ -406,7 +449,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'video_description',
             'work_experiences',
             'certifications',
-            'projects'
+            'portfolio'
         ]
 
 class UsersearchSerializer(serializers.ModelSerializer):

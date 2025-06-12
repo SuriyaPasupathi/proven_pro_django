@@ -25,7 +25,8 @@ from .views import (
     submit_profile_review,
     DropdownAPIView,
     SkillsDropdownAPIView,
-    UsersearchApiview
+    UsersearchApiview,
+    DeleteItemView
     
 
 )
@@ -40,6 +41,8 @@ urlpatterns = [
     path('users-search/', UsersearchApiview.as_view(), name='highest-rated-users-api'),
     path('dropdown/', DropdownAPIView.as_view(), name='dropdown'),
     path('skills-dropdown/', SkillsDropdownAPIView.as_view(), name='skills-dropdown'),
+    path('delete/<str:model_name>/<uuid:pk>/', DeleteItemView.as_view()),
+
     #auth
     path('google-auth/', google_auth.as_view(), name='google-auth'),
     path('login/', LoginView.as_view(), name='login'),
