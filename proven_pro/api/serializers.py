@@ -448,10 +448,11 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'soft_skills',
             'skills_description',
             'video_intro_url',
+            
             'video_description',
             'work_experiences',
             'certifications',
-            'projects'
+            'portfolio'
         ]
 
 class UsersearchSerializer(serializers.ModelSerializer):
