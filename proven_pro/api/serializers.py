@@ -461,13 +461,12 @@ class UsersearchSerializer(serializers.ModelSerializer):
     rating = serializers.SerializerMethodField()
     bio = serializers.CharField()
     profile_pic = serializers.ImageField()
-    experiences = work_experiences_Serializer(many=True, read_only=True)
-   
+
 
 
     class Meta:
         model = Users
-        fields = ('id', 'username', 'description', 'rating','bio', 'profile_pic','position')
+        fields = ('id', 'username', 'description', 'rating','bio', 'profile_pic')
 
     def get_description(self, obj):
         return obj.bio or "N/A"
