@@ -448,7 +448,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'soft_skills',
             'skills_description',
             'video_intro_url',
-            
+            'experiences',
             'video_description',
             'work_experiences',
             'certifications',

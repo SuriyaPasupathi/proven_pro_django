@@ -3,17 +3,11 @@ version: '3.8'
 services:
   db1:
     image: mysql:8
-    expose:
-      - 3306
     ports:
-      - "3306:3307" 
+      - "3306:3306"
     environment:
-      
       MYSQL_DATABASE: 'venkat_proven_pro'
       MYSQL_USER: 'root'
-      MYSQL_PORT: '3306'
-      DB_HOST: 'db1'
-      # MYSQL_PASSWORD: '1234'
       MYSQL_ROOT_PASSWORD: '1234'
 
   web:
@@ -25,15 +19,13 @@ services:
       - "8000:8000"
     depends_on:
       - db1
-    links:
-      - db1
-    command:
-      - /bin/bash
-      - -c
-      - |
-        sleep 10
-        python3 manage.py makemigrations
-        python3 manage.py makemigrations app/
-        python3 manage.py migrate
-        python3 manage.py migrate app/
+    command: >
+      sh -c "
+        until mysqladmin ping -h db1 -uroot -p1234 --silent; do
+          echo 'Waiting for MySQL...';
+          sleep 2;
+        done;
+        python3 manage.py makemigrations &&
+        python3 manage.py migrate &&
         python3 manage.py runserver 0.0.0.0:8000
+      "
