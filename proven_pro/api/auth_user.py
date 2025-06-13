@@ -22,7 +22,7 @@ import random
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
-
+from django.core.mail import EmailMessage
 User = get_user_model()
 
 
@@ -573,14 +573,23 @@ class AccountSettingsView(APIView):
         return Response({'message': 'Password changed successfully'})
 
     def _send_email_otp(self, email, otp_code, user):
-        """Send OTP to the user's email"""
         try:
             subject = "Verify Your New Email Address"
-            message = f"Hello {user.name or user.username},\n\nYour OTP code is: {otp_code}\n\nThis code will expire in 10 minutes.\n\nRegards,\nProven Pro Team"
-            from_email = settings.DEFAULT_FROM_EMAIL
+            context = {
+                'name': user.name if hasattr(user, 'name') else user.username,
+                'otp_code': otp_code,
+                }
+            html_content = render_to_string('emails/email_change_otp.html', context)
+            email_message = EmailMessage(
+                subject=subject,
+                body=html_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[email]
+                )
+            email_message.content_subtype = 'html'  # To send as HTML email
+            email_message.send(fail_silently=False)
 
-            send_mail(subject, message, from_email, [email], fail_silently=False)
-        except Exception as e:
+        except Exception as e:  # ✅ properly aligned with try
             import traceback
             print("Error sending OTP email:", str(e))
             print(traceback.format_exc())
