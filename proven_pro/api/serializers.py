@@ -291,6 +291,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 for i, cert in enumerate(json.loads(self.certifications_data)):
                     image_file = self.certification_images.get(str(i))  # <- define here
                     cert_id = cert.get("id")
+                    print(cert_id)
                     if cert_id:
                         Certification.objects.filter(id=cert_id, user=instance).update(
                             certifications_name=cert.get('certifications_name', ''),
@@ -314,7 +315,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                         )
             except Exception as e:
                 print(f"Certification Error: {e}")
-            deleted_cert_ids = self.initial_data.get('deleted_certification_ids', [])
+
 
         # Handle Categories
         categories_data = self.categories_data

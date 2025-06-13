@@ -2,30 +2,66 @@ version: '3.8'
 
 services:
   db1:
-    image: mysql:8
+    image: mysql:8.0
+    container_name: proven_pro_db
+    restart: always
     ports:
       - "3306:3306"
     environment:
       MYSQL_DATABASE: 'venkat_proven_pro'
-      MYSQL_USER: 'root'
       MYSQL_ROOT_PASSWORD: '1234'
+      MYSQL_USER: 'proven_user'
+      MYSQL_PASSWORD: '1234'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - proven_pro_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
-    image: proven_pro
+    container_name: proven_pro_web
+    restart: always
     volumes:
       - .:/app
+      - static_volume:/app/static:rw
+      - media_volume:/app/media:rw
     ports:
       - "8000:8000"
+    environment:
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=venkat_proven_pro
+      - DB_USER=proven_user
+      - DB_PASSWORD=1234
+      - DB_HOST=db1
+      - DB_PORT=3306
     depends_on:
-      - db1
+      db1:
+        condition: service_healthy
+    networks:
+      - proven_pro_network
     command: >
       sh -c "
-        until mysqladmin ping -h db1 -uroot -p1234 --silent; do
-          echo 'Waiting for MySQL...';
-          sleep 2;
-        done;
-        python3 manage.py makemigrations &&
-        python3 manage.py migrate &&
+        echo 'Waiting for MySQL...' &&
+        while ! nc -z db1 3306; do
+          sleep 1
+        done &&
+        echo 'MySQL is up!' &&
+        python3 manage.py makemigrations && python3 manage.py makemigrations api &&
+        python3 manage.py migrate && python3 manage.py migrate api &&
+        python3 manage.py collectstatic --noinput &&
         python3 manage.py runserver 0.0.0.0:8000
       "
+
+networks:
+  proven_pro_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  static_volume:
+  media_volume:
