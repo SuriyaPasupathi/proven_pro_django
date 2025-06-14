@@ -20,7 +20,7 @@ import logging
 # from twilio.rest import Client
 import random
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 import logging
@@ -32,7 +32,7 @@ from django.core.paginator import Paginator
 Users = get_user_model()
 
 def health_check(request):
-    return JsonResponse({"status_api_working": "ok"})
+    return JsonResponse({"status_api_working_": "ok"})
 
 # Correct full path to JSON file inside your app folder
 json_file_path = os.path.join(settings.BASE_DIR, 'api', 'profile_fields.json')
@@ -662,6 +662,18 @@ class DeleteItemView(APIView):
             return Response({'message': f'{model_name} with ID {pk} deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
         except model_class.DoesNotExist:
             return Response({'error': f'{model_name} not found'}, status=status.HTTP_404_NOT_FOUND)
+
+def serve_media(request, path):
+    """
+    Custom view to serve media files with proper URL handling
+    """
+    try:
+        file_path = os.path.join(settings.MEDIA_ROOT, path)
+        if os.path.exists(file_path):
+            return FileResponse(open(file_path, 'rb'))
+        return HttpResponse(status=404)
+    except Exception as e:
+        return HttpResponse(status=404)
 
 
 
