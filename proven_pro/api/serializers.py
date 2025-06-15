@@ -458,8 +458,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Users
-        fields = ('id', 'username', 'email', 'subscription_type', 'subscription_active',
-            'subscription_start_date', 'subscription_end_date',
+        fields = ('id', 'username', 'email', 
             'first_name', 'last_name', 'bio',
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
             'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail', 'mobile',
@@ -474,6 +473,12 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'services_categories', 'services_description', 'rate_range', 'availability',
             'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
             'mobile_verified', 'verification_status')
+
+    def get_profile_pic_url(self, obj):
+        return obj.profile_pic.url if obj.profile_pic else None
+
+    def get_video_intro_url(self, obj):
+        return obj.video_intro.url if obj.video_intro else None
 
 
 class UsersearchSerializer(serializers.ModelSerializer):
