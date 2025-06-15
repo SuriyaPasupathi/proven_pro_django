@@ -413,7 +413,7 @@ class ProfileShareSerializer(serializers.ModelSerializer):
 class PublicProfileSerializer(serializers.ModelSerializer):
     experiences = work_experiences_Serializer(many=True, read_only=True)
     certifications = CertificationSerializer(many=True, read_only=True)
-    projects = PortfolioSerializer(many=True, read_only=True)
+    portfolio = PortfolioSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
     # Add fields for reading the file URLs
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
