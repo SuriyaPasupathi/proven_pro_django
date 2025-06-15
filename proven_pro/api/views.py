@@ -187,7 +187,7 @@ class UserSearchFilterView(APIView):
 
 logger = logging.getLogger(__name__)
 class profile_share_actions(APIView):
-    permission_classes = [IsAuthenticated]
+   
 
     def get(self, request):
         action = request.query_params.get('action')

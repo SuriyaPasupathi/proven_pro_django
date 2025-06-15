@@ -453,7 +453,23 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             'video_description',
             'work_experiences',
             'certifications',
-            'portfolio'
+            'portfolio',
+            'categories',
+            'social_links',
+            'client_reviews',
+            'profile_url',
+            'profile_mail',
+            'verification_status',
+            'gov_id_document',
+            'gov_id_verified',
+            'address_document',
+            'address_verified',
+            'mobile_verified',
+            'profile_pic',
+            'video_intro',
+            'profile_pic_url',
+            'video_intro_url'
+
         ]
 
 class UsersearchSerializer(serializers.ModelSerializer):
