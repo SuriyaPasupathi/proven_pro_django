@@ -411,7 +411,7 @@ class ProfileShareSerializer(serializers.ModelSerializer):
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
-   client_reviews = ReviewSerializer(many=True, read_only=True)
+    client_reviews = ReviewSerializer(many=True, read_only=True)
     work_experiences = work_experiences_Serializer(many=True, read_only=True, source='experiences')
     certifications = CertificationSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
