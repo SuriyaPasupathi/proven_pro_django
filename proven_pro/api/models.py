@@ -10,6 +10,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Avg
 from django.core.cache import cache
+from proven_pro.storage_backends import (
+    ProfilePicStorage, 
+    VerificationDocStorage, 
+    VideoStorage,
+    CertificationStorage,
+    ProjectImageStorage
+)
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -50,7 +57,7 @@ class Users(AbstractUser):
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
     profile_mail = models.EmailField(unique=True, blank=True, null=True)
-    profile_pic = models.ImageField(upload_to='user_profiles_pic/', null=True, blank=True)
+    profile_pic = models.ImageField(upload_to='profile_pics/', storage=ProfilePicStorage, null=True, blank=True)
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
@@ -60,14 +67,14 @@ class Users(AbstractUser):
     soft_skills = models.TextField(blank=True)
     skills_description = models.TextField(blank=True)
 
-    video_intro = models.FileField(upload_to='videos/', null=True, blank=True)
+    video_intro = models.FileField(upload_to='videos/', storage=VideoStorage, null=True, blank=True)
     video_description = models.TextField(blank=True)
 
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
 
-    gov_id_document = models.FileField(upload_to='verification/gov_id/', null=True, blank=True)
+    gov_id_document = models.FileField(upload_to='gov_id/', storage=VerificationDocStorage, null=True, blank=True)
     gov_id_verified = models.BooleanField(default=False)
-    address_document = models.FileField(upload_to='verification/address/', null=True, blank=True)
+    address_document = models.FileField(upload_to='address/', storage=VerificationDocStorage, null=True, blank=True)
     address_verified = models.BooleanField(default=False)
     mobile_verified = models.BooleanField(default=False)
     verification_percentage = models.IntegerField(default=0)
@@ -158,7 +165,7 @@ class Certification(models.Model):
     certifications_issued_date = models.DateField()
     certifications_expiration_date = models.DateField(null=True, blank=True)
     certifications_id = models.TextField(blank=True)
-    certifications_image =models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    certifications_image = models.ImageField(upload_to='certifications/', storage=CertificationStorage, null=True, blank=True)
     certifications_image_url = models.URLField(blank=True, null=True)
 
 
@@ -177,7 +184,7 @@ class Portfolio(models.Model):
     project_title = models.CharField(max_length=100)
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
-    project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+    project_image = models.ImageField(upload_to='project_images/', storage=ProjectImageStorage, null=True, blank=True)
 
 
 class SocialLink(models.Model):

@@ -28,6 +28,12 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from django.db.models import Max, Count, Q, Avg
 from django.core.paginator import Paginator
+from django.views import View
+from urllib.parse import unquote
+import mimetypes
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from io import BytesIO
 
 Users = get_user_model()
 
@@ -596,7 +602,7 @@ class UsersearchApiview(APIView):
                 avg_rating=Avg('client_reviews__rating')
             )
 
-            # ✅ Apply min_rating only if there is a rating
+            #  Apply min_rating only if there is a rating
             queryset = queryset.filter(
                 Q(max_individual_rating__isnull=True) | Q(max_individual_rating__gte=min_rating)
             )
@@ -664,16 +670,61 @@ class DeleteItemView(APIView):
             return Response({'error': f'{model_name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
 def serve_media(request, path):
-    """
-    Custom view to serve media files with proper URL handling
-    """
     try:
-        file_path = os.path.join(settings.MEDIA_ROOT, path)
-        if os.path.exists(file_path):
-            return FileResponse(open(file_path, 'rb'))
-        return HttpResponse(status=404)
+        # Clean the path
+        path = unquote(path)
+        
+        # If path starts with blob:, remove it and any extra slashes
+        if path.startswith('blob:'):
+            path = path.replace('blob:', '').lstrip('/')
+        
+        # Handle regular media files
+        if settings.DEFAULT_FILE_STORAGE == 'storages.backends.s3boto3.S3Boto3Storage':
+            # For S3 storage
+            file_url = default_storage.url(path)
+            return HttpResponse(file_url)
+        else:
+            # For local storage
+            file_path = os.path.join(settings.MEDIA_ROOT, path)
+            if os.path.exists(file_path):
+                content_type, _ = mimetypes.guess_type(file_path)
+                return FileResponse(open(file_path, 'rb'), content_type=content_type)
+            return HttpResponse('File not found', status=404)
+
     except Exception as e:
-        return HttpResponse(status=404)
+        return HttpResponse(f'Error serving media: {str(e)}', status=500)
+
+class BlobMediaView(View):
+    def get(self, request, path=None, *args, **kwargs):
+        try:
+            # Get the URL from either the path or query parameter
+            url = path or request.GET.get('url')
+            if not url:
+                return HttpResponse('No URL provided', status=400)
+
+            # Clean the URL
+            url = unquote(url)
+            
+            # Remove blob: prefix if present
+            if url.startswith('blob:'):
+                url = url.replace('blob:', '').lstrip('/')
+            
+            # Fetch the content
+            response = requests.get(url)
+            if response.status_code != 200:
+                return HttpResponse('Failed to fetch content', status=400)
+
+            # Get the content type
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            
+            # Create a BytesIO object from the content
+            content = BytesIO(response.content)
+            
+            # Return the file response
+            return FileResponse(content, content_type=content_type)
+
+        except Exception as e:
+            return HttpResponse(f'Error processing request: {str(e)}', status=500)
 
 
 

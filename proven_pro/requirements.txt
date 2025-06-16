@@ -20,3 +20,5 @@ pytest-django
 mysql-connector-python
 gunicorn
 redis
+django-storages
+requests
