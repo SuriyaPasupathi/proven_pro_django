@@ -57,7 +57,7 @@ class Users(AbstractUser):
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
     profile_mail = models.EmailField(unique=True, blank=True, null=True)
-    profile_pic = models.ImageField(upload_to='profile_pics/', storage=ProfilePicStorage, null=True, blank=True)
+    profile_pic = models.ImageField( storage=ProfilePicStorage, null=True, blank=True)
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
@@ -67,7 +67,7 @@ class Users(AbstractUser):
     soft_skills = models.TextField(blank=True)
     skills_description = models.TextField(blank=True)
 
-    video_intro = models.FileField(upload_to='videos/', storage=VideoStorage, null=True, blank=True)
+    video_intro = models.FileField(storage=VideoStorage, null=True, blank=True)
     video_description = models.TextField(blank=True)
 
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
