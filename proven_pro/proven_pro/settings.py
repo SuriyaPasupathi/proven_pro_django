@@ -93,7 +93,8 @@ AWS_S3_VERIFY = True
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-MEDIA_ROOT = ''
+MEDIA_ROOT = 'media/'
+
 
 # Static files configuration
 STATICFILES_STORAGE = 'proven_pro.storage_backends.StaticStorage'
@@ -102,6 +103,8 @@ STATIC_ROOT = 'static/'
 
 # Storage class mappings
 STORAGE_CLASSES = {
+    'media': 'proven_pro.storage_backends.MediaStorage',
+    'static': 'proven_pro.storage_backends.StaticStorage',
     'profile_pics': 'proven_pro.storage_backends.ProfilePicStorage',
     'verification_docs': 'proven_pro.storage_backends.VerificationDocStorage',
     'videos': 'proven_pro.storage_backends.VideoStorage',

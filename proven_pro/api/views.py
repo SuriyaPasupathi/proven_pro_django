@@ -108,10 +108,6 @@ class UserProfileView(APIView):
         return Response(serializer.errors, status=400)
 
 
-    def delete(self, request, user_id):
-        user = get_object_or_404(Users, id=user_id)
-        user.delete()
-        return Response({"detail": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
     
 
 class DropdownAPIView(APIView):
@@ -194,7 +190,6 @@ class UserSearchFilterView(APIView):
 logger = logging.getLogger(__name__)
 class profile_share_actions(APIView):
    
-
     def get(self, request):
         action = request.query_params.get('action')
         user_id = request.query_params.get('user_id')
@@ -253,7 +248,7 @@ class profile_share_actions(APIView):
                 return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
             share_token = user.generate_share_link(recipient_email)
-            verification_url = f"{settings.FRONTEND_URL}/share/{user.id}/{share_token}"
+            verification_url = f"{settings.FRONTEND_URL}/share/{share_token}"
 
             try:
                 context = {
