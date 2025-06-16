@@ -7,9 +7,6 @@ import json
 import logging
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
-import phonenumbers
-from rest_framework import serializers
-from phonenumbers.phonenumberutil import NumberParseException
 
 Users = get_user_model()
 
@@ -19,7 +16,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Users
         fields = ('username', 'email', 'password')
-
+    
     def validate_email(self, value):
         try:
             validate_email(value)
@@ -49,7 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
-
+ 
 # Forgot Password
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -215,15 +212,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_video_intro_url(self, obj):
         return obj.video_intro.url if obj.video_intro else None
-
-    def validate_mobile(self, value):
-        try:
-            phone_number = phonenumbers.parse(value, None)  # Parse with no default region
-            if not phonenumbers.is_valid_number(phone_number):
-                raise serializers.ValidationError("Invalid mobile number format for the given country.")
-        except NumberParseException:
-            raise serializers.ValidationError("Enter a valid mobile number in international format (e.g., +14155552671).")
-        return value
 
     def validate(self, data):
         self.work_experiences_data = self.initial_data.get('work_experiences')
