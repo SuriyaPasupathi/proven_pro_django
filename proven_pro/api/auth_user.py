@@ -380,21 +380,27 @@ class LoginView(APIView):
         user = Users.objects.filter(email=email).first()
 
         if user:
-            # Check if the is_verified field exists before checking it
+            # Case 1: User is not verified
             if hasattr(user, 'is_verified') and not user.is_verified:
-                return Response({"detail": "Account not verified. Please confirm registration from your email."}, status=status.HTTP_403_FORBIDDEN)
+                otp_resent = self._resend_otp(user)  # Call resend OTP
+                if otp_resent:
+                    return Response({
+                        "detail": "Account not verified. A new OTP has been sent to your email."
+                    }, status=status.HTTP_403_FORBIDDEN)
+                else:
+                    return Response({
+                        "detail": "Account not verified. Failed to send OTP email."
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+            # Case 2: User is verified and password is correct
             if user.check_password(password):
                 refresh = RefreshToken.for_user(user)
-                
-                # Check if user has completed their profile
                 has_profile = bool(
-                    user.first_name and 
-                    user.last_name and 
+                    user.first_name and
+                    user.last_name and
                     hasattr(user, 'job_title') and user.job_title
                 )
-                
-                # Include profile status in response
+
                 return Response({
                     "message": "Login successful!",
                     "access": str(refresh.access_token),
@@ -410,8 +416,42 @@ class LoginView(APIView):
                     "subscription_type": user.subscription_type
                 }, status=status.HTTP_200_OK)
 
+        # Case 3: Invalid credentials
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
+    def _resend_otp(self, user):
+        """Resend OTP logic"""
+        try:
+            otp_code = str(random.randint(100000, 999999))
+            user.otp = otp_code
+            user.save()
+
+            context = {
+                'username': user.username,
+                'email': user.email,
+                'otp_code': otp_code
+            }
+
+            html_content = render_to_string('emails/otp_email.html', context)
+            subject = "Your OTP for Registration"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            to_email = user.email
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=html_content,
+                from_email=from_email,
+                to=[to_email]
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            print(f"Resent OTP to {user.email}: {otp_code}")
+            return True
+
+        except Exception as e:
+            print(f"Failed to resend OTP: {str(e)}")
+            return False
 #password reset
 class RequestResetPasswordView(APIView):
     def post(self, request):
