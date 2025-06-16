@@ -15,6 +15,8 @@ from datetime import timedelta
 from decouple import config
 
 import os
+from .storage_backends import MediaStorage, StaticStorage
+from storages.backends.s3boto3 import S3Boto3Storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,7 +47,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'rest_framework_simplejwt',
     'corsheaders',
-    
+    'storages',
 ]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173"
@@ -76,20 +78,36 @@ REST_FRAMEWORK = {
     ),
     
 }
-# Use Amazon S3 for media storage
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+#Use Amazon S3 for media storage
+DEFAULT_FILE_STORAGE = 'proven_pro.storage_backends.MediaStorage'
 
-# AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
-# AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-# AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
-# AWS_S3_REGION_NAME = 'us-east-1'  # Change if your bucket is in a different region
-# AWS_S3_SIGNATURE_VERSION = 's3v4'
-# AWS_S3_FILE_OVERWRITE = False
-# AWS_DEFAULT_ACL = None
-# AWS_QUERYSTRING_AUTH = False
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
+AWS_S3_SIGNATURE_VERSION = 's3v4'
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_VERIFY = True
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 
-# MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/'
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+MEDIA_ROOT = ''
 
+# Static files configuration
+STATICFILES_STORAGE = 'proven_pro.storage_backends.StaticStorage'
+STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+STATIC_ROOT = 'static/'
+
+# Storage class mappings
+STORAGE_CLASSES = {
+    'profile_pics': 'proven_pro.storage_backends.ProfilePicStorage',
+    'verification_docs': 'proven_pro.storage_backends.VerificationDocStorage',
+    'videos': 'proven_pro.storage_backends.VideoStorage',
+    'certifications': 'proven_pro.storage_backends.CertificationStorage',
+    'project_images': 'proven_pro.storage_backends.ProjectImageStorage',
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -149,13 +167,10 @@ DATABASES = {
 }
 
 
-# Media files configuration
-MEDIA_URL = ''  # Remove the media/ prefix since we're handling it in the URL pattern
-MEDIA_ROOT = BASE_DIR / 'media'
 
-# Static files configuration
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+# # Static files configuration
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

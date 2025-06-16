@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
@@ -26,7 +26,8 @@ from .views import (
     SkillsDropdownAPIView,
     UsersearchApiview,
     DeleteItemView,
-    serve_media
+    serve_media,
+    BlobMediaView
 )
 
 router = DefaultRouter()
@@ -77,7 +78,8 @@ urlpatterns = [
     path('verification-status/', GetVerificationStatusView.as_view(), name='verification-status'),
     path('admin/document-approval-webhook/', admin_document_approval_webhook.as_view(), name='admin-document-approval-webhook'),
 
-    path('account-settings/', AccountSettingsView.as_view(), name='account-settings'), # Add the new view here
+    path('account-settings/', AccountSettingsView.as_view(), name='account-settings'),
     path('media/<path:path>', serve_media, name='serve_media'),
+    path('file/<path:path>', BlobMediaView.as_view(), name='file_media'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
