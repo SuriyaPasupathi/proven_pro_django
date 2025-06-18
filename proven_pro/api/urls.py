@@ -36,6 +36,9 @@ router.register(r'register', RegisterViewSet, basename='otp')
 
 urlpatterns = [
     path('health_check', health_check, name='health_check'),
+    # path('otp/register/', RegisterViewSet.as_view({'post': 'create'}), name='otp-register'),
+    path('otp/verify/', RegisterViewSet.as_view({'post': 'verify'}), name='otp-verify'),
+    path('otp/resend/', RegisterViewSet.as_view({'post': 'resend'}), name='otp-resend'),
      
     path('users-search/', UsersearchApiview.as_view(), name='highest-rated-users-api'),
     path('dropdown/', DropdownAPIView.as_view(), name='dropdown'),
