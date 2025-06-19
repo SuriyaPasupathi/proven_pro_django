@@ -3,20 +3,29 @@
 <head>
     <meta charset="utf-8">
     <title>Your OTP for Registration</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        h2 { color: #2c3e50; }
-        .otp-code { font-size: 24px; font-weight: bold; color: #3498db; letter-spacing: 2px; margin: 20px 0; }
-    </style>
 </head>
 <body>
     <h2>Your OTP for Registration</h2>
+
     <p>Hello {{ username }},</p>
+
     <p>Your OTP for registration is:</p>
-    <p class="otp-code">{{ otp_code }}</p>
+    <p><strong>{{ otp_code }}</strong></p>
+
     <p>This OTP was requested for the account with email: {{ email }}</p>
-    <p>Please enter this code to complete your registration.</p>
+
+    <p>Please enter this code in the application to complete your registration.</p>
+
+    <p><strong>OR</strong></p>
+
+    <p>You can also verify your account directly by clicking the link below:</p>
+
+    <p>
+        <a href="{{ verify_link }}">Verify OTP</a>
+    </p>
+
     <p>This code will expire in 10 minutes.</p>
+
     <p>Best regards,<br>
     The Proven Pro Team</p>
 </body>
