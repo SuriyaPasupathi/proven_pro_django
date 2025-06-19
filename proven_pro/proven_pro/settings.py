@@ -101,18 +101,10 @@ MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 MEDIA_ROOT = 'media/'
 
 
-STATIC_URL = '/static/'   
-
-# Use absolute path for STATIC_ROOT
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-
-STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Storage class mappings
 STORAGE_CLASSES = {
     'media': 'proven_pro.storage_backends.MediaStorage',
-    'static': 'proven_pro.storage_backends.StaticStorage',
     'profile_pics': 'proven_pro.storage_backends.ProfilePicStorage',
     'verification_docs': 'proven_pro.storage_backends.VerificationDocStorage',
     'videos': 'proven_pro.storage_backends.VideoStorage',
@@ -180,8 +172,8 @@ DATABASES = {
 
 
 # # Static files configuration
-# STATIC_URL = '/static/'
-# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
