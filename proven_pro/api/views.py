@@ -248,7 +248,7 @@ class profile_share_actions(APIView):
                 return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
             share_token = user.generate_share_link(recipient_email)
-            verification_url = f"{settings.FRONTEND_URL}/share/{user_id}/{share_token}"
+            verification_url = f"{settings.FRONTEND_URL}/share/{share_token}"
 
 
 
