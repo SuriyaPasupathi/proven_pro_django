@@ -4,8 +4,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.utils import timezone
-from .models import Users
+from .models import Users, SubscriptionPayment
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics
+from .serializers import SubscriptionPaymentSerializer
 
 # Helper: Get Maya headers
 def get_maya_headers():
@@ -64,6 +66,14 @@ class CreateMayaSubscriptionView(APIView):
 
         if response.status_code == 200:
             checkout_data = response.json()
+            payment = SubscriptionPayment.objects.create(
+                user=request.user,
+                plan=plan,
+                amount=amount,
+                status='PENDING',
+                reference=payload['requestReferenceNumber'],
+                maya_checkout_id=checkout_data.get('checkoutId')
+            )
             return Response({
                 "checkout_id": checkout_data.get("checkoutId"),
                 "redirect_url": checkout_data.get("redirectUrl")
@@ -136,3 +146,10 @@ class MayaWebhookView(APIView):
             except Users.DoesNotExist:
                 pass
         return Response({'status': 'received'})
+
+class UserSubscriptionPaymentsView(generics.ListAPIView):
+    serializer_class = SubscriptionPaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SubscriptionPayment.objects.filter(user=self.request.user).order_by('-created_at')

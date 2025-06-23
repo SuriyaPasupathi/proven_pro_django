@@ -10,6 +10,21 @@ from django.core.validators import validate_email
 
 Users = get_user_model()
 
+
+# in proven_pro/api/serializers.py
+
+from rest_framework import serializers
+from .models import SubscriptionPayment
+
+class SubscriptionPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPayment
+        fields = [
+            'id', 'user', 'plan', 'amount', 'status', 'reference', 'maya_checkout_id', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ('id', 'created_at', 'updated_at', 'user')
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 

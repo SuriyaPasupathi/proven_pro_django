@@ -318,3 +318,23 @@ class Skill(models.Model):
 
 
 
+# in proven_pro/api/models.py
+
+
+class SubscriptionPayment(models.Model):
+    PLAN_CHOICES = [
+        ('standard', 'Standard'),
+        ('premium', 'Premium'),
+    ]
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='subscription_payments')
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=50)  # e.g., 'PENDING', 'COMPLETED', 'FAILED'
+    reference = models.CharField(max_length=100, unique=True)
+    maya_checkout_id = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+
+

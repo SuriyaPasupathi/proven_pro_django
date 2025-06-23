@@ -31,7 +31,8 @@ from .views import (
     CreateMayaSubscriptionView,
     VerifyMayaPaymentView,
     RetryMayaPaymentView,
-    MayaWebhookView
+    MayaWebhookView,    
+    UserSubscriptionPaymentsView
 )
 
 router = DefaultRouter()
@@ -69,14 +70,13 @@ urlpatterns = [
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
     # Updated subscription endpoints
-    path('update-subscription/', UpdateSubscriptionView.as_view(), name='update-subscription'),
-    # path('create-payment-intent/', CreatePaymentIntentView.as_view(), name='create-payment-intent'),
     
     path('create-maya-subscription/', CreateMayaSubscriptionView.as_view(), name='create-maya-subscription'),
     path('verify-maya-payment/', VerifyMayaPaymentView.as_view(), name='verify-maya-payment'),
     path('retry-maya-payment/', RetryMayaPaymentView.as_view(), name='retry-maya-payment'),
     path('maya-webhook/', MayaWebhookView.as_view(), name='maya-webhook'),
-]
+    path('my-subscription-payments/', UserSubscriptionPaymentsView.as_view(), name='subscription-payments'),
+
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),
