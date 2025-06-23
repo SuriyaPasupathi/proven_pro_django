@@ -37,7 +37,8 @@ class CreateMayaSubscriptionView(APIView):
                 "firstName": request.user.first_name,
                 "lastName": request.user.last_name,
                 "contact": {
-                    "email": request.user.email
+                    "email": request.user.email,
+                    "phone": request.user.mobile
                 }
             },
             "redirectUrl": {
@@ -105,7 +106,27 @@ class VerifyMayaPaymentView(APIView):
                 user.subscription_start_date = timezone.now()
                 user.subscription_end_date = timezone.now() + timezone.timedelta(days=30)
                 user.save()
-                return Response({'status': 'success', 'plan': plan})
+
+                # Update payment record
+                payment = SubscriptionPayment.objects.filter(
+                    user=user, maya_checkout_id=checkout_id
+                ).first()
+                if payment:
+                    payment.status = 'COMPLETED'
+                    payment.save()
+                else:
+                    # Optionally create if not found
+                    payment = SubscriptionPayment.objects.create(
+                        user=user,
+                        plan=plan,
+                        amount=data['totalAmount']['value'],
+                        status='COMPLETED',
+                        reference=data.get('requestReferenceNumber', ''),
+                        maya_checkout_id=checkout_id
+                    )
+
+                serializer = SubscriptionPaymentSerializer(payment)
+                return Response({'status': 'success', 'plan': plan, 'payment': serializer.data})
             else:
                 return Response({'status': status_})
         else:
