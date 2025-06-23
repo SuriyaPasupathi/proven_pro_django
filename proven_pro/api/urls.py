@@ -27,7 +27,11 @@ from .views import (
     UsersearchApiview,
     DeleteItemView,
     serve_media,
-    BlobMediaView
+    BlobMediaView,
+    CreateMayaSubscriptionView,
+    VerifyMayaPaymentView,
+    RetryMayaPaymentView,
+    MayaWebhookView
 )
 
 router = DefaultRouter()
@@ -68,11 +72,11 @@ urlpatterns = [
     path('update-subscription/', UpdateSubscriptionView.as_view(), name='update-subscription'),
     # path('create-payment-intent/', CreatePaymentIntentView.as_view(), name='create-payment-intent'),
     
-    path('create-gcash-payment/', CreateGCashPaymentView.as_view(), name='create-gcash-payment'),
-    path('gcash-webhook/', GCashWebhookView.as_view(), name='gcash-webhook'),
-    path('verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
-    path('paymongo-webhook/', PayMongoWebhookView.as_view(), name='paymongo-webhook'),
-    path('subscription-check/', SubscriptionCheckView.as_view(), name='subscription-check'),
+    path('create-maya-subscription/', CreateMayaSubscriptionView.as_view(), name='create-maya-subscription'),
+    path('verify-maya-payment/', VerifyMayaPaymentView.as_view(), name='verify-maya-payment'),
+    path('retry-maya-payment/', RetryMayaPaymentView.as_view(), name='retry-maya-payment'),
+    path('maya-webhook/', MayaWebhookView.as_view(), name='maya-webhook'),
+]
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),

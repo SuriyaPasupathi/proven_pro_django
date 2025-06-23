@@ -13,6 +13,7 @@ db.sqlite3
 
 # Django specific
 media/
+static/
 staticfiles/
 local_settings.py
 migrations/

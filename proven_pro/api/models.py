@@ -25,8 +25,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.core.cache import cache
 import uuid
-
-import uuid
+from uuid import uuid4
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.cache import cache
@@ -57,11 +56,10 @@ class Users(AbstractUser):
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
     profile_mail = models.EmailField(unique=True, blank=True, null=True)
-    profile_pic = models.ImageField( storage=ProfilePicStorage, null=True, blank=True)
+    profile_pic = models.ImageField( storage=ProfilePicStorage(), null=True, blank=True)
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
-
     primary_tools = models.TextField(max_length=100, blank=True)
     technical_skills = models.TextField(max_length=100, blank=True)
     soft_skills = models.TextField(blank=True)
@@ -252,7 +250,29 @@ def handle_verification_status_change(sender, instance, **kwargs):
         if 'address_verified' in kwargs['update_fields']:
             instance.send_verification_status_email('address', instance.address_verified)
 
+def profile_pic_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.id}/profile_pics/{uuid4().hex}.{ext}"
 
+def profile_video_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.id}/videos/{uuid4().hex}.{ext}"
+
+def certification_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.user.id}/certifications/{uuid4().hex}.{ext}"
+
+def gov_id_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.id}/gov_id/{uuid4().hex}.{ext}"
+
+def address_doc_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.id}/address_docs/{uuid4().hex}.{ext}"
+
+def project_image_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f"user_{instance.user.id}/projects/{uuid4().hex}.{ext}"
 
 
 

@@ -142,6 +142,8 @@ TEMPLATES = [
     },
 ]
 
+
+
 WSGI_APPLICATION = 'proven_pro.wsgi.application'
 
 SIMPLE_JWT = {
