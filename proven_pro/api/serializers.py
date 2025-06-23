@@ -277,28 +277,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Experiences.objects.filter(id__in=deleted_exp_ids, user=instance).delete()
 
         # Handle Portfolio
-        if self.portfolio_data:
-            try:
-                for i, proj in enumerate(json.loads(self.portfolio_data)):
-                    project_id = proj.get("id")
-                    image_file = self.project_images.get(str(i))
-                    if project_id:
-                        Portfolio.objects.filter(id=project_id, user=instance).update(
-                            project_title=proj.get('project_title', ''),
-                            project_description=proj.get('project_description', ''),
-                            project_url=proj.get('project_url', ''),
-                            project_image=image_file if image_file else 'project_image'
-                        )
-                    else:
-                        Portfolio.objects.create(
-                            user=instance,
-                            project_title=proj.get('project_title', ''),
-                            project_description=proj.get('project_description', ''),
-                            project_url=proj.get('project_url', ''),
-                            project_image=image_file
-                        )
-            except Exception as e:
-                print(f"Portfolio Error: {e}")
+        for i, proj in enumerate(json.loads(self.portfolio_data)):
+            project_id = proj.get("id")
+            image_file = self.project_images.get(str(i))  # Can be None
+
+            if project_id:
+                portfolio_instance = Portfolio.objects.filter(id=project_id, user=instance).first()
+                if portfolio_instance:
+                    portfolio_instance.project_title = proj.get('project_title', '')
+                    portfolio_instance.project_description = proj.get('project_description', '')
+                    portfolio_instance.project_url = proj.get('project_url', '')
+                    if image_file:
+                        portfolio_instance.project_image = image_file  # Only update if a new image is provided
+                    portfolio_instance.save()
+            else:
+                Portfolio.objects.create(
+                    user=instance,
+                    project_title=proj.get('project_title', ''),
+                    project_description=proj.get('project_description', ''),
+                    project_url=proj.get('project_url', ''),
+                    project_image=image_file  # Will be None if not uploaded — that's OK
+        )
 
         deleted_proj_ids = self.initial_data.get('deleted_project_ids', [])
         if isinstance(deleted_proj_ids, str):
