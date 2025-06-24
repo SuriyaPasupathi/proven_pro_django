@@ -8,12 +8,15 @@ from .models import Users, SubscriptionPayment
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics
 from .serializers import SubscriptionPaymentSerializer
+import base64
 
 # Helper: Get Maya headers
 def get_maya_headers():
+    secret = settings.MAYA_SECRET_KEY
+    encoded = base64.b64encode(f"{secret}:".encode()).decode()
     return {
         "Content-Type": "application/json",
-        "Authorization": f"Basic {settings.MAYA_SECRET_KEY}"
+        "Authorization": f"Basic {encoded}"
     }
 
 # 1. Create Maya Subscription (initiate payment)

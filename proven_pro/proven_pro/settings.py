@@ -15,7 +15,7 @@ from datetime import timedelta
 from decouple import config
 
 import os
-from .storage_backends import MediaStorage, StaticStorage
+from .storage_backends import MediaStorage
 from storages.backends.s3boto3 import S3Boto3Storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -172,6 +172,8 @@ DATABASES = {
         'PORT': config('DB_PORT', default='3306'),
     }
 }
+STATICFILES_STORAGE = 'proven_pro.storage_backends.StaticStorage'
+STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
 
 
 
@@ -262,8 +264,7 @@ LOGGING = {
 }
 
 
-PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
-PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
+
 
 # Add these settings for CSRF
 CSRF_COOKIE_SAMESITE = 'Lax'  # Use 'None' if your frontend is on a different domain

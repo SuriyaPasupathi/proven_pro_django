@@ -24,3 +24,4 @@ class CertificationStorage(S3Boto3Storage):
 class ProjectImageStorage(S3Boto3Storage):
     location = 'media/project_images'
     file_overwrite = False 
+

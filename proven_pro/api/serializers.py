@@ -248,7 +248,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         for field in ['first_name', 'last_name', 'bio', 'primary_tools', 'technical_skills',
-                      'soft_skills', 'skills_description', 'video_description', 'mobile']:
+                    'soft_skills', 'skills_description', 'video_description', 'mobile']:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
 
@@ -261,7 +261,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # Handle Experiences
         if self.work_experiences_data:
             try:
-                for exp in json.loads(self.work_experiences_data):
+                for exp in json.loads(self.work_experiences_data or '[]'):
                     exp_id = exp.get("id")
                     if exp_id:
                         Experiences.objects.filter(id=exp_id, user=instance).update(
@@ -291,33 +291,38 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 deleted_exp_ids = []
         Experiences.objects.filter(id__in=deleted_exp_ids, user=instance).delete()
 
-        # Handle Portfolio
-        for i, proj in enumerate(json.loads(self.portfolio_data)):
-            project_id = proj.get("id")
-            image_file = self.project_images.get(str(i))  # Can be None
+        # ✅ Handle Portfolio safely
+        if self.portfolio_data:
+            try:
+                for i, proj in enumerate(json.loads(self.portfolio_data or '[]')):
+                    project_id = proj.get("id")
+                    image_file = self.project_images.get(str(i)) if hasattr(self, 'project_images') else None
 
-            if project_id:
-                portfolio_instance = Portfolio.objects.filter(id=project_id, user=instance).first()
-                if portfolio_instance:
-                    portfolio_instance.project_title = proj.get('project_title', '')
-                    portfolio_instance.project_description = proj.get('project_description', '')
-                    portfolio_instance.project_url = proj.get('project_url', '')
-                    if image_file:
-                        portfolio_instance.project_image = image_file  # Only update if a new image is provided
-                    portfolio_instance.save()
-            else:
-                Portfolio.objects.create(
-                    user=instance,
-                    project_title=proj.get('project_title', ''),
-                    project_description=proj.get('project_description', ''),
-                    project_url=proj.get('project_url', ''),
-                    project_image=image_file  # Will be None if not uploaded — that's OK
-        )
+                    if project_id:
+                        portfolio_instance = Portfolio.objects.filter(id=project_id, user=instance).first()
+                        if portfolio_instance:
+                            portfolio_instance.project_title = proj.get('project_title', '')
+                            portfolio_instance.project_description = proj.get('project_description', '')
+                            portfolio_instance.project_url = proj.get('project_url', '')
+                            if image_file:
+                                portfolio_instance.project_image = image_file
+                            portfolio_instance.save()
+                    else:
+                        Portfolio.objects.create(
+                            user=instance,
+                            project_title=proj.get('project_title', ''),
+                            project_description=proj.get('project_description', ''),
+                            project_url=proj.get('project_url', ''),
+                            project_image=image_file
+                        )
+            except Exception as e:
+                print(f"Portfolio Error: {e}")
 
+        # Handle Certifications
         if self.certifications_data:
             try:
-                for i, cert in enumerate(json.loads(self.certifications_data)):
-                    image_file = self.certification_images.get(str(i))
+                for i, cert in enumerate(json.loads(self.certifications_data or '[]')):
+                    image_file = self.certification_images.get(str(i)) if hasattr(self, 'certification_images') else None
                     cert_id = cert.get("id")
                     if cert_id:
                         Certification.objects.filter(id=cert_id, user=instance).update(
@@ -389,6 +394,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
 
 #request password serlizers
 class RequestPasswordResetSerializer(serializers.Serializer):
