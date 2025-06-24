@@ -277,7 +277,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Experiences.objects.filter(id__in=deleted_exp_ids, user=instance).delete()
 
         # Handle Portfolio
-        for i, proj in enumerate(json.loads(self.portfolio_data)):
+        portfolio_data_raw = self.portfolio_data
+        if portfolio_data_raw:
+            try:
+                parsed_portfolio_data = json.loads(portfolio_data_raw)
+            except json.JSONDecodeError:
+                parsed_portfolio_data = []
+        else:
+            parsed_portfolio_data = []
+
+        for i, proj in enumerate(parsed_portfolio_data):
             project_id = proj.get("id")
             image_file = self.project_images.get(str(i))  # Can be None
 
@@ -297,7 +306,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                     project_description=proj.get('project_description', ''),
                     project_url=proj.get('project_url', ''),
                     project_image=image_file  # Will be None if not uploaded — that's OK
-        )
+                )
 
         deleted_proj_ids = self.initial_data.get('deleted_project_ids', [])
         if isinstance(deleted_proj_ids, str):
@@ -306,6 +315,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             except json.JSONDecodeError:
                 deleted_proj_ids = []
         Portfolio.objects.filter(id__in=deleted_proj_ids, user=instance).delete()
+
 
         # Handle Certifications
         if self.certifications_data:
