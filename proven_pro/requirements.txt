@@ -28,3 +28,4 @@ whitenoise
 requests
 boto3
 django-storages
+twilio
