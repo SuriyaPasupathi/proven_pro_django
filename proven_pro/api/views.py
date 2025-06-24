@@ -129,6 +129,7 @@ class DropdownAPIView(APIView):
 class SkillsDropdownAPIView(APIView):
     def get(self, request):
         category_filter = request.query_params.get('category')
+        print(category_filter)
 
         if category_filter:
             try:

@@ -258,8 +258,8 @@ LOGGING = {
 }
 
 
-PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
-PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
+# PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
+# PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
 
 # Add these settings for CSRF
 CSRF_COOKIE_SAMESITE = 'Lax'  # Use 'None' if your frontend is on a different domain
