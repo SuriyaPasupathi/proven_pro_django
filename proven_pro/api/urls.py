@@ -8,7 +8,7 @@ from .auth_user import (
 )
 from .subscription import(
     SubscriptionCheckView,
-    UpdateSubscriptionView,CreateGCashPaymentView,VerifyPaymentView,PayMongoWebhookView,GCashWebhookView)
+    UpdateSubscriptionView,CreateGCashPaymentView,VerifyPaymentView,PayMongoWebhookView,GCashWebhookView,SubscribePlanView)
 
 from .views import ( 
     UserProfileView,    
@@ -68,6 +68,8 @@ urlpatterns = [
     path('update-subscription/', UpdateSubscriptionView.as_view(), name='update-subscription'),
     # path('create-payment-intent/', CreatePaymentIntentView.as_view(), name='create-payment-intent'),
     
+
+    path('api/subscribe/', SubscribePlanView.as_view(), name='subscribe-plan'),
     path('create-gcash-payment/', CreateGCashPaymentView.as_view(), name='create-gcash-payment'),
     path('gcash-webhook/', GCashWebhookView.as_view(), name='gcash-webhook'),
     path('verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
