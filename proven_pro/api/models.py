@@ -131,7 +131,7 @@ class Users(AbstractUser):
             send_mail(subject, message, settings.EMAIL_HOST_USER, [self.email], fail_silently=False)
         except Exception as e:
             import logging
-            logger = logging.getLogger(__name__)
+            logger = logging.getLogger(_name_)
             logger.error(f"Failed to send verification email: {str(e)}")
 
     class Meta:
@@ -203,7 +203,7 @@ class SocialLink(models.Model):
     class Meta:
         unique_together = ('user', 'platform')
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.user.name}'s {self.get_platform_display()}"
 
 
@@ -237,7 +237,7 @@ class ProfileShare(models.Model):
     def is_valid(self):
         return timezone.now() <= self.expires_at
 
-    def __str__(self):
+    def _str_(self):
         return f"Share for {self.user.name} - {self.recipient_email}"
 
     class Meta:
@@ -261,7 +261,7 @@ class Service_drop_down(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
 
-    def __str__(self):
+    def _str_(self):
         return self.name
 
 
@@ -269,7 +269,7 @@ class JobPosition(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=100)
 
-    def __str__(self):
+    def _str_(self):
         return self.title
 
 
@@ -280,7 +280,7 @@ class ToolsSkillsCategory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)  # e.g., "Primary Skills"
 
-    def __str__(self):
+    def _str_(self):
         return self.name
 
 
@@ -291,6 +291,7 @@ class Skill(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)  # e.g., "Python"
     category = models.ForeignKey(ToolsSkillsCategory, on_delete=models.CASCADE, related_name='skills')
+
 
     def __str__(self):
         return f"{self.name} ({self.category.name})"
@@ -309,7 +310,6 @@ class PlanDetails(models.Model):
 
     def __str__(self):
         return f"{self.get_plan_name_display()} - ${self.price}"
-
 
 
 

@@ -34,6 +34,7 @@ import mimetypes
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from io import BytesIO
+from twilio.rest import Client
 
 Users = get_user_model()
 
@@ -129,6 +130,7 @@ class DropdownAPIView(APIView):
 class SkillsDropdownAPIView(APIView):
     def get(self, request):
         category_filter = request.query_params.get('category')
+        print(category_filter)
 
         if category_filter:
             try:
@@ -421,25 +423,39 @@ class UploadVerificationDocumentView(APIView):
 
 class RequestMobileVerificationView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
-        user = request.user
+        user_id = request.data.get('user_id')
         mobile = request.data.get('mobile')
-        
+
+        if not user_id:
+            return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
         if not mobile:
             return Response({'error': 'Mobile number is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Prevent sending OTP to Twilio number itself
+        if mobile == settings.TWILIO_PHONE_NUMBER:
+            return Response({
+                'error': 'Cannot send OTP to Twilio phone number itself.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Update user's mobile number
         user.mobile = mobile
         user.save()
-        
-        # Generate OTP
+
+        # Generate a 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        
+
         # Store OTP in session
         request.session['mobile_otp'] = otp
         request.session['mobile_to_verify'] = mobile
-        
+
         try:
             # Send OTP via Twilio
             client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
@@ -448,18 +464,18 @@ class RequestMobileVerificationView(APIView):
                 from_=settings.TWILIO_PHONE_NUMBER,
                 to=mobile
             )
-            
+
             return Response({
                 'message': 'Verification code sent to your mobile number',
                 'sid': message.sid
             })
+
         except Exception as e:
             logging.error(f"Twilio error: {str(e)}")
             return Response({
                 'error': 'Failed to send verification code',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 class VerifyMobileOTPView(APIView):
     permission_classes = [IsAuthenticated]
 
