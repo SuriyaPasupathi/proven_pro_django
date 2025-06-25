@@ -295,6 +295,21 @@ class Skill(models.Model):
     def __str__(self):
         return f"{self.name} ({self.category.name})"
 
+class PlanDetails(models.Model):
+    PLAN_CHOICES = [
+        ('basic', 'Basic'),
+        ('standard', 'Standard'),
+        ('premium', 'Premium'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    plan_name = models.CharField(max_length=20, choices=PLAN_CHOICES, unique=True)
+    price = models.DecimalField(max_digits=6, decimal_places=2)
+    includes = models.TextField()  # JSON will be stored as text string
+
+    def __str__(self):
+        return f"{self.get_plan_name_display()} - ${self.price}"
+
 
 
 

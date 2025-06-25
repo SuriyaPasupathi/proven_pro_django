@@ -4,6 +4,10 @@ from django.contrib import messages
 from .models import Users, PendingUsers, ProfileShare, Review, ToolsSkillsCategory,JobPosition,Service_drop_down,Skill
 from django.db import models
 from django.db.models import Q
+import json
+from django import forms
+from django.contrib import admin
+from .models import PlanDetails
 
 class SkillInline(admin.TabularInline):
     model = Skill
@@ -134,6 +138,35 @@ class PendingUsersAdmin(admin.ModelAdmin):
 
     pending_percentage_display.short_description = 'Pending %'
 
+# admin.py
+
+class PlanDetailsForm(forms.ModelForm):
+    class Meta:
+        model = PlanDetails
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Show as multiline string in textarea
+        if self.instance and self.instance.includes:
+            try:
+                data = json.loads(self.instance.includes)
+                multiline_str = "\n".join(data[str(i)] for i in range(1, len(data) + 1))
+                self.fields['includes'].initial = multiline_str
+            except Exception:
+                pass
+
+    def clean_includes(self):
+        value = self.cleaned_data['includes']
+        lines = [line.strip() for line in value.split('\n') if line.strip()]
+        data = {str(i + 1): line for i, line in enumerate(lines)}
+        return json.dumps(data)  # Save as JSON string
+
+class PlanDetailsAdmin(admin.ModelAdmin):
+    form = PlanDetailsForm
+
+admin.site.register(PlanDetails, PlanDetailsAdmin)
 
 
 admin.site.register(PendingUsers, PendingUsersAdmin)
