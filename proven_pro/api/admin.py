@@ -138,8 +138,6 @@ class PendingUsersAdmin(admin.ModelAdmin):
 
     pending_percentage_display.short_description = 'Pending %'
 
-# admin.py
-
 class PlanDetailsForm(forms.ModelForm):
     class Meta:
         model = PlanDetails
@@ -148,21 +146,47 @@ class PlanDetailsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Show as multiline string in textarea
+        # Show raw text from includes content — no assumptions
         if self.instance and self.instance.includes:
             try:
                 data = json.loads(self.instance.includes)
-                multiline_str = "\n".join(data[str(i)] for i in range(1, len(data) + 1))
-                self.fields['includes'].initial = multiline_str
+                if isinstance(data, list) and data and isinstance(data[0], dict):
+                    titles = data[0].get("title", {})
+                    if isinstance(titles, dict):
+                        self.fields['includes'].initial = "\n".join(titles.values())
             except Exception:
-                pass
+                self.fields['includes'].initial = self.instance.includes
 
     def clean_includes(self):
-        value = self.cleaned_data['includes']
-        lines = [line.strip() for line in value.split('\n') if line.strip()]
-        data = {str(i + 1): line for i, line in enumerate(lines)}
-        return json.dumps(data)  # Save as JSON string
+        raw = self.cleaned_data['includes']
 
+        # Try parsing raw input as JSON
+        try:
+            parsed = json.loads(raw)
+
+            # Already in the expected format
+            if (
+                isinstance(parsed, list) and len(parsed) == 1 and
+                isinstance(parsed[0], dict) and isinstance(parsed[0].get("title"), dict)
+            ):
+                return json.dumps(parsed, indent=2)
+
+            # If it's a flat list of strings (["A", "B", ...])
+            if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
+                return json.dumps([{"title": {str(i+1): x for i, x in enumerate(parsed)}}], indent=2)
+
+            # If it's just a dict like {"1": "Feature A", ...}
+            if isinstance(parsed, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()):
+                return json.dumps([{"title": parsed}], indent=2)
+
+        except Exception:
+            pass  # fallback to line-based text
+
+        # Treat as plain multiline text input
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        title_dict = {str(i+1): line for i, line in enumerate(lines)}
+        return json.dumps([{"title": title_dict}], indent=2)
+    
 class PlanDetailsAdmin(admin.ModelAdmin):
     form = PlanDetailsForm
 
