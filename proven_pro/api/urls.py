@@ -11,7 +11,11 @@ from .subscription import(
     VerifyMayaPaymentView,
     RetryMayaPaymentView,
     MayaWebhookView,    
-    UserSubscriptionPaymentsView)
+    UserSubscriptionPaymentsView,
+    SubscribePlanView
+
+
+    )
 
 from .views import ( 
     UserProfileView,    
@@ -83,7 +87,9 @@ urlpatterns = [
     path('verify-mobile-otp/', VerifyMobileOTPView.as_view(), name='verify-mobile-otp'),
     path('verification-status/', GetVerificationStatusView.as_view(), name='verification-status'),
     path('admin/document-approval-webhook/', admin_document_approval_webhook.as_view(), name='admin-document-approval-webhook'),
+    
 
+    path('subscribe/', SubscribePlanView.as_view(), name='subscribe-plan'),
     path('account-settings/', AccountSettingsView.as_view(), name='account-settings'),
     path('media/<path:path>', serve_media, name='serve_media'),
     path('file/<path:path>', BlobMediaView.as_view(), name='file_media'),
