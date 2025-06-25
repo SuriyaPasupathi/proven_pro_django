@@ -258,9 +258,9 @@ LOGGING = {
 }
 
 
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
+# TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+# TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+# TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
 
 # PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
 # PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
@@ -271,11 +271,10 @@ CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_COOKIE_HTTPONLY = False  # False allows JavaScript to access the cookie
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
 
-# Twilio settings
-# TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
-# TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-# TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
+
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER')
 
 
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '264e-103-186-120-4.ngrok-free.app', '13.213.131.66']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'eb8a-103-186-120-4.ngrok-free.app', '13.213.131.66']
