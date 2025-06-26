@@ -189,7 +189,7 @@ class UserSearchFilterView(APIView):
         serializer = UserProfileSerializer(users, many=True)
         return Response(serializer.data)
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 class profile_share_actions(APIView):
    
     def get(self, request):
@@ -452,9 +452,14 @@ class RequestMobileVerificationView(APIView):
         # Generate a 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
 
-        # Store OTP in session
-        request.session['mobile_otp'] = otp
-        request.session['mobile_to_verify'] = mobile
+        # Store OTP in database instead of session
+        user.otp = otp
+        user.otp_created_at = timezone.now()
+        user.save()
+
+        # Debug logging
+        print(f"Debug - Generated OTP: {otp}")
+        print(f"Debug - Stored OTP in database for user: {user.id}")
 
         try:
             # Send OTP via Twilio
@@ -509,10 +514,9 @@ class VerifyMobileOTPView(APIView):
         now = timezone.now()
 
         if resend:
-            last_sent_time = request.session.get('otp_sent_time')
+            last_sent_time = user.otp_created_at
 
             if last_sent_time:
-                last_sent_time = timezone.datetime.fromisoformat(last_sent_time)
                 elapsed = (now - last_sent_time).total_seconds()
                 if elapsed < 45:
                     return Response({
@@ -522,9 +526,9 @@ class VerifyMobileOTPView(APIView):
 
             # Resend OTP
             new_otp = self.generate_otp()
-            request.session['mobile_otp'] = new_otp
-            request.session['mobile_to_verify'] = user.mobile
-            request.session['otp_sent_time'] = now.isoformat()
+            user.otp = new_otp
+            user.otp_created_at = now
+            user.save()
 
             self.send_sms(user.mobile, new_otp)
 
@@ -532,22 +536,28 @@ class VerifyMobileOTPView(APIView):
 
         # Regular OTP verification
         otp = request.data.get('otp')
-        stored_otp = request.session.get('mobile_otp')
-        mobile_to_verify = request.session.get('mobile_to_verify')
+        stored_otp = user.otp
+        otp_created_at = user.otp_created_at
 
-        if not stored_otp or not mobile_to_verify:
+        # Debug logging
+        print(f"Debug - Received OTP: {otp}")
+        print(f"Debug - Stored OTP from database: {stored_otp}")
+        print(f"Debug - OTP created at: {otp_created_at}")
+
+        if not stored_otp or not otp_created_at:
             return Response({'error': 'No verification in progress'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if OTP is expired (15 minutes)
+        if timezone.now() - otp_created_at > timezone.timedelta(minutes=15):
+            return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
         if otp != stored_otp:
             return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
 
         user.mobile_verified = True
+        user.otp = None  # Clear OTP after successful verification
+        user.otp_created_at = None
         user.save()
-
-        # Clear session
-        request.session.pop('mobile_otp', None)
-        request.session.pop('mobile_to_verify', None)
-        request.session.pop('otp_sent_time', None)
 
         return Response({
             'message': 'Mobile number verified successfully',
@@ -641,13 +651,13 @@ class admin_document_approval_webhook(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 
 class UsersearchApiview(APIView):
     def get(self, request):
         try:
             offset = int(request.GET.get('offset', 0))
-            limit = int(request.GET.get('limit', 12))
+            limit = int(request.GET.get('limit',20))
             search = request.GET.get('search', '').strip()
             min_rating = int(request.GET.get('min_rating', 1))
 
@@ -659,7 +669,7 @@ class UsersearchApiview(APIView):
 
             #  Apply min_rating only if there is a rating
             queryset = queryset.filter(
-                Q(max_individual_rating__isnull=True) | Q(max_individual_rating__gte=min_rating)
+                Q(max_individual_rating_isnull=True) | Q(max_individual_rating_gte=min_rating)
             )
 
             if search:
@@ -780,6 +790,3 @@ class BlobMediaView(View):
 
         except Exception as e:
             return HttpResponse(f'Error processing request: {str(e)}', status=500)
-
-
-

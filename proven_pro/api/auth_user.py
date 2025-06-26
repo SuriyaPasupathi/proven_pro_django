@@ -1,4 +1,3 @@
-
 import uuid
 from .serializers import RegisterSerializer
 from rest_framework import status
@@ -253,8 +252,17 @@ class RegisterViewSet(viewsets.ViewSet):
         try:
             user = Users.objects.get(email=email)
 
-            # ✅ Removed check for user.is_verified
-            # ✅ Removed time delay check
+            # Check if OTP was recently sent (30-second cooldown)
+            if user.otp_created_at:
+                current_time = timezone.now()
+                time_since_last_otp = (current_time - user.otp_created_at).total_seconds()
+                
+                if time_since_last_otp < 30:  # 30-second cooldown
+                    remaining_time = int(30 - time_since_last_otp)
+                    return Response({
+                        "error": f"Please wait {remaining_time} seconds before requesting a new OTP.",
+                        "cooldown_remaining": remaining_time
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
             self._generate_and_send_otp(user)
             return Response({
@@ -432,7 +440,7 @@ class RequestResetPasswordView(APIView):
                 })
 
             except Exception as e:
-                logger = logging.getLogger(__name__)
+                logger = logging.getLogger(_name_)
                 logger.error(f"Password reset email failed: {str(e)}")
                 return Response({
                     "error": "Failed to send password reset email. Please try again later.",
@@ -589,5 +597,3 @@ class LogoutView(APIView):
             return Response({"detail": "Logout successful."}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-

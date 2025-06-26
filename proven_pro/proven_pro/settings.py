@@ -19,7 +19,7 @@ from .storage_backends import MediaStorage, StaticStorage
 from storages.backends.s3boto3 import S3Boto3Storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(_file_).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
@@ -271,6 +271,12 @@ CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_COOKIE_HTTPONLY = False  # False allows JavaScript to access the cookie
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
 
+# Session configuration
+SESSION_COOKIE_SAMESITE = 'Lax'  # Use 'None' if your frontend is on a different domain
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = False  # False allows JavaScript to access the cookie
+SESSION_COOKIE_AGE = 3600  # 1 hour session timeout
+SESSION_SAVE_EVERY_REQUEST = True  # Save session on every request
 
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN')
