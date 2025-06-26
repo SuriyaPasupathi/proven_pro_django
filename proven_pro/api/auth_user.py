@@ -19,6 +19,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from .models import Users
 import random
+from datetime import timedelta
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -162,6 +163,7 @@ class google_auth(APIView):
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 class RegisterViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
@@ -205,36 +207,39 @@ class RegisterViewSet(viewsets.ViewSet):
         try:
             user = Users.objects.get(email=email)
 
-            if user.is_verified:
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    "message": "User is already verified",
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email
-                    }
-                }, status=status.HTTP_200_OK)
+            if not user.otp or not user.otp_created_at:
+                return Response({"error": "No OTP was sent or OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if str(user.otp) == str(otp):
-                user.is_verified = True
-                user.otp = None
-                user.save()
-                refresh = RefreshToken.for_user(user)
+            current_time = timezone.now()
+            otp_expiry_time = user.otp_created_at + timedelta(minutes=5)
+
+            if current_time > otp_expiry_time:
+                self._generate_and_send_otp(user)
                 return Response({
-                    "message": "OTP verified. Registration successful!",
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email
-                    }
-                }, status=status.HTTP_200_OK)
-            else:
+                    "error": "OTP has expired. A new OTP has been sent to your email.",
+                    "email": user.email
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if str(user.otp) != str(otp):
                 return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
+
+            user.is_verified = True
+            user.otp = None
+            user.otp_created_at = None
+            user.save()
+
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "message": "OTP verified. Registration successful!",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email
+                }
+            }, status=status.HTTP_200_OK)
+
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -247,8 +252,17 @@ class RegisterViewSet(viewsets.ViewSet):
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             user = Users.objects.get(email=email)
-            if user.is_verified:
-                return Response({"error": "User is already verified"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ❌ Removed the block that prevents resending for verified users
+
+            # ✅ Block resend if less than 5 minutes since last OTP
+            if user.otp_created_at:
+                elapsed = (timezone.now() - user.otp_created_at).total_seconds()
+                if elapsed < 300:
+                    return Response({
+                        "error": "Please wait before resending OTP",
+                        "seconds_remaining": int(300 - elapsed)
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
             self._generate_and_send_otp(user)
             return Response({
@@ -263,12 +277,11 @@ class RegisterViewSet(viewsets.ViewSet):
     def _generate_and_send_otp(self, user):
         otp_code = str(random.randint(100000, 999999))
         user.otp = otp_code
+        user.otp_created_at = timezone.now()
         user.save()
 
         try:
-            # ✅ Updated to include email in URL
             verify_link = f"{settings.FRONTEND_URL}/check-email-code?email={user.email}"
-
             context = {
                 'username': user.username,
                 'email': user.email,
@@ -295,7 +308,6 @@ class RegisterViewSet(viewsets.ViewSet):
         except Exception as e:
             print(f"Failed to send OTP email: {str(e)}")
             return False
-
 class LoginView(APIView):
     def post(self, request):
         email = request.data.get("email")

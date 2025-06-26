@@ -479,18 +479,59 @@ class RequestMobileVerificationView(APIView):
 class VerifyMobileOTPView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def generate_otp(self):
+        return str(random.randint(100000, 999999))
+
+    def send_sms(self, mobile, otp):
+        try:
+            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            message = f"Your OTP for verification is {otp}"
+
+            client.messages.create(
+                body=message,
+                from_=settings.TWILIO_PHONE_NUMBER,
+                to=mobile  # Ensure mobile number is in E.164 format (e.g., +917010319399)
+            )
+        except Exception as e:
+            print("Twilio Error:", str(e))
+
     def post(self, request):
-        user_id = request.query_params.get('user_id')  # Get user ID from query params
+        user_id = request.query_params.get('user_id')
         if not user_id:
             return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = Users.objects.get(id=user_id)  # Replace with your actual user model
+            user = Users.objects.get(id=user_id)
         except Users.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        otp = request.data.get('otp')
+        resend = request.data.get('resend', False)
+        now = timezone.now()
 
+        if resend:
+            last_sent_time = request.session.get('otp_sent_time')
+
+            if last_sent_time:
+                last_sent_time = timezone.datetime.fromisoformat(last_sent_time)
+                elapsed = (now - last_sent_time).total_seconds()
+                if elapsed < 45:
+                    return Response({
+                        'error': 'Please wait before resending OTP',
+                        'seconds_remaining': int(45 - elapsed)
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+            # Resend OTP
+            new_otp = self.generate_otp()
+            request.session['mobile_otp'] = new_otp
+            request.session['mobile_to_verify'] = user.mobile
+            request.session['otp_sent_time'] = now.isoformat()
+
+            self.send_sms(user.mobile, new_otp)
+
+            return Response({'message': 'OTP resent successfully'}, status=status.HTTP_200_OK)
+
+        # Regular OTP verification
+        otp = request.data.get('otp')
         stored_otp = request.session.get('mobile_otp')
         mobile_to_verify = request.session.get('mobile_to_verify')
 
@@ -500,13 +541,13 @@ class VerifyMobileOTPView(APIView):
         if otp != stored_otp:
             return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify the mobile number
         user.mobile_verified = True
         user.save()
 
-        # Clear session data
-        del request.session['mobile_otp']
-        del request.session['mobile_to_verify']
+        # Clear session
+        request.session.pop('mobile_otp', None)
+        request.session.pop('mobile_to_verify', None)
+        request.session.pop('otp_sent_time', None)
 
         return Response({
             'message': 'Mobile number verified successfully',

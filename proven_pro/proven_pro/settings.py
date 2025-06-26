@@ -277,5 +277,5 @@ TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN')
 TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER')
 
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '264e-103-186-120-4.ngrok-free.app', '13.213.131.66','provenpro.net',
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'e75d-103-186-120-4.ngrok-free.app', '13.213.131.66','provenpro.net',
     'www.provenpro.net']
