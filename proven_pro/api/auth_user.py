@@ -253,29 +253,22 @@ class RegisterViewSet(viewsets.ViewSet):
         try:
             user = Users.objects.get(email=email)
 
-            # ❌ Removed the block that prevents resending for verified users
-
-            # ✅ Block resend if less than 5 minutes since last OTP
-            if user.otp_created_at:
-                elapsed = (timezone.now() - user.otp_created_at).total_seconds()
-                if elapsed < 300:
-                    return Response({
-                        "error": "Please wait before resending OTP",
-                        "seconds_remaining": int(300 - elapsed)
-                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            # ✅ Removed check for user.is_verified
+            # ✅ Removed time delay check
 
             self._generate_and_send_otp(user)
             return Response({
                 "message": "New OTP sent to your email",
                 "email": user.email
             }, status=status.HTTP_200_OK)
+
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     def _generate_and_send_otp(self, user):
         otp_code = str(random.randint(100000, 999999))
+        print(otp_code)
         user.otp = otp_code
         user.otp_created_at = timezone.now()
         user.save()
