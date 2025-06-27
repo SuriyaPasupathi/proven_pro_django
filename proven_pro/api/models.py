@@ -10,7 +10,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Avg
 from django.core.cache import cache
-
+from proven_pro.storage_backends import (
+    ProfilePicStorage, 
+    VerificationDocStorage, 
+    VideoStorage,
+    CertificationStorage,
+    ProjectImageStorage
+)
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -31,26 +37,27 @@ from django.conf import settings
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    temp_email = models.EmailField(blank=True, null=True)  # Used for email change OTP
     is_verified = models.BooleanField(default=False)
     otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)  # Tracks OTP creation time
+
     google_id = models.CharField(max_length=255, null=True, blank=True)
     is_google_user = models.BooleanField(default=False)
     reset_token = models.CharField(max_length=255, null=True, blank=True)
     token_created_at = models.DateTimeField(null=True, blank=True)
 
-    # Subscription fields
     SUBSCRIPTION_CHOICES = [('free', 'Free'), ('standard', 'Standard'), ('premium', 'Premium')]
     subscription_type = models.CharField(max_length=10, choices=SUBSCRIPTION_CHOICES, default='free')
     subscription_active = models.BooleanField(default=True)
     subscription_start_date = models.DateTimeField(null=True, blank=True)
     subscription_end_date = models.DateTimeField(null=True, blank=True)
 
-    # Profile fields
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
     profile_mail = models.EmailField(unique=True, blank=True, null=True)
-    profile_pic = models.ImageField(upload_to='user_profiles_pic/', null=True, blank=True)
+    profile_pic = models.ImageField( storage=ProfilePicStorage, null=True, blank=True)
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
@@ -60,14 +67,14 @@ class Users(AbstractUser):
     soft_skills = models.TextField(blank=True)
     skills_description = models.TextField(blank=True)
 
-    video_intro = models.FileField(upload_to='videos/', null=True, blank=True)
+    video_intro = models.FileField(storage=VideoStorage, null=True, blank=True)
     video_description = models.TextField(blank=True)
 
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
 
-    gov_id_document = models.FileField(upload_to='verification/gov_id/', null=True, blank=True)
+    gov_id_document = models.FileField(upload_to='gov_id/', storage=VerificationDocStorage, null=True, blank=True)
     gov_id_verified = models.BooleanField(default=False)
-    address_document = models.FileField(upload_to='verification/address/', null=True, blank=True)
+    address_document = models.FileField(upload_to='address/', storage=VerificationDocStorage, null=True, blank=True)
     address_verified = models.BooleanField(default=False)
     mobile_verified = models.BooleanField(default=False)
     verification_percentage = models.IntegerField(default=0)
@@ -92,8 +99,7 @@ class Users(AbstractUser):
             self.profile_url = str(uuid.uuid4())[:8]
         super().save(*args, **kwargs)
 
-    def generate_share_link(self, recipient_email, expires_in_days=7):
-        from your_app.models import ProfileShare  # Make sure to import your actual app name
+    def generate_share_link(self, recipient_email, expires_in_days=1):
         share = ProfileShare.objects.create(
             user=self,
             recipient_email=recipient_email,
@@ -110,22 +116,22 @@ class Users(AbstractUser):
         document_name = "Government ID" if document_type == "gov_id" else "Address Proof"
         subject = f"Your {document_name} verification {status}"
         message = f"""
-Hello {self.name},
+        Hello {self.name},
 
-Your {document_name} has been {status} by our verification team.
+        Your {document_name} has been {status} by our verification team.
 
-Your current verification status is {self.verification_status}%.
+        Your current verification status is {self.verification_status}%.
 
-Thank you for using our service.
+            Thank you for using our service.
 
-Best regards,
-The Proven Pro Team
-"""
+            Best regards,
+            The Proven Pro Team
+            """
         try:
             send_mail(subject, message, settings.EMAIL_HOST_USER, [self.email], fail_silently=False)
         except Exception as e:
             import logging
-            logger = logging.getLogger(__name__)
+            logger = logging.getLogger(_name_)
             logger.error(f"Failed to send verification email: {str(e)}")
 
     class Meta:
@@ -134,15 +140,15 @@ The Proven Pro Team
             models.Index(fields=['subscription_start_date']),
             models.Index(fields=['profile_url']),
         ]
-
 # Proxy model for pending users
 class PendingUsers(Users):
     class Meta:
         proxy = True
         verbose_name = 'Pending User'
-        verbose_name_plural = 'Pending Users'
+        verbose_name_plural = 'Pending Verify Users'
 
-class Experience(models.Model):
+class Experiences(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='experiences')
     company_name = models.CharField(max_length=150)
     position = models.CharField(max_length=100)
@@ -152,17 +158,19 @@ class Experience(models.Model):
 
 
 class Certification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='certifications')
     certifications_name = models.CharField(max_length=100)
     certifications_issuer = models.CharField(max_length=100)
     certifications_issued_date = models.DateField()
     certifications_expiration_date = models.DateField(null=True, blank=True)
     certifications_id = models.TextField(blank=True)
-    certifications_image =models.ImageField(upload_to='certifications_images/', null=True, blank=True)
+    certifications_image = models.ImageField(upload_to='certifications/', storage=CertificationStorage, null=True, blank=True)
     certifications_image_url = models.URLField(blank=True, null=True)
 
 
 class ServiceCategory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='categories')
     services_categories = models.TextField(blank=True)
     services_description = models.TextField(blank=True)
@@ -170,12 +178,13 @@ class ServiceCategory(models.Model):
     availability = models.TextField(blank=True)
 
 
-class Project(models.Model):
+class Portfolio(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
     project_title = models.CharField(max_length=100)
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
-    project_image = models.ImageField(upload_to='project_images/', null=True, blank=True)
+    project_image = models.ImageField(upload_to='project_images/', storage=ProjectImageStorage, null=True, blank=True)
 
 
 class SocialLink(models.Model):
@@ -194,7 +203,7 @@ class SocialLink(models.Model):
     class Meta:
         unique_together = ('user', 'platform')
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.user.name}'s {self.get_platform_display()}"
 
 
@@ -228,7 +237,7 @@ class ProfileShare(models.Model):
     def is_valid(self):
         return timezone.now() <= self.expires_at
 
-    def __str__(self):
+    def _str_(self):
         return f"Share for {self.user.name} - {self.recipient_email}"
 
     class Meta:
@@ -242,3 +251,64 @@ def handle_verification_status_change(sender, instance, **kwargs):
             instance.send_verification_status_email('gov_id', instance.gov_id_verified)
         if 'address_verified' in kwargs['update_fields']:
             instance.send_verification_status_email('address', instance.address_verified)
+
+
+
+
+
+#dropdown models:
+class Service_drop_down(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    def _str_(self):
+        return self.name
+
+
+class JobPosition(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=100)
+
+    def _str_(self):
+        return self.title
+
+
+class ToolsSkillsCategory(models.Model):
+    """
+    Represents categories like Primary Skills, Technical Skills, Soft Skills
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)  # e.g., "Primary Skills"
+
+    def _str_(self):
+        return self.name
+
+
+class Skill(models.Model):
+    """
+    Actual skills under a category
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)  # e.g., "Python"
+    category = models.ForeignKey(ToolsSkillsCategory, on_delete=models.CASCADE, related_name='skills')
+
+
+    def __str__(self):
+        return f"{self.name} ({self.category.name})"
+
+class PlanDetails(models.Model):
+    PLAN_CHOICES = [
+        ('basic', 'Basic'),
+        ('standard', 'Standard'),
+        ('premium', 'Premium'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    plan_name = models.CharField(max_length=20, choices=PLAN_CHOICES, unique=True)
+    price = models.DecimalField(max_digits=6, decimal_places=2)
+    includes = models.TextField()
+
+    def __str__(self):
+        return f"{self.get_plan_name_display()} - ${self.price}"
+
+

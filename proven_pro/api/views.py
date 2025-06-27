@@ -5,9 +5,9 @@ from rest_framework import viewsets, permissions, status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
-from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer
+from .serializers import UserProfileSerializer, ReviewSerializer, PublicProfileSerializer,JobPositionserializers,Skills_serializers,Tools_Skills_serializers,Service_drop_down_serializers, UsersearchSerializer,Experiences, Certification, ServiceCategory, Portfolio
 import json , os
-from .models import Review, ProfileShare
+from .models import Review, ProfileShare,Service_drop_down,JobPosition,ToolsSkillsCategory,Skill
 from django.conf import settings
 from django.utils import timezone
 import uuid
@@ -20,18 +20,30 @@ import logging
 # from twilio.rest import Client
 import random
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
+import logging
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+from django.db.models import Max, Count, Q, Avg
+from django.core.paginator import Paginator
+from django.views import View
+from urllib.parse import unquote
+import mimetypes
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from io import BytesIO
+from twilio.rest import Client
 
 Users = get_user_model()
 
 def health_check(request):
-    return JsonResponse({"status_api_working": "ok"})
+    return JsonResponse({"status_api_working_": "ok"})
 
 # Correct full path to JSON file inside your app folder
 json_file_path = os.path.join(settings.BASE_DIR, 'api', 'profile_fields.json')
-print(json_file_path,"asdgiuagsiudysa")
+
 with open(json_file_path) as file:
     profile_fields = json.load(file)
     SUBSCRIPTION_FIELDS = profile_fields["SUBSCRIPTION_FIELDS"]
@@ -42,87 +54,100 @@ class UserProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        user = request.user
-        
-        # Serialize the user with all related data
-        serializer = UserProfileSerializer(user)
-        
-        # Return the complete serialized data without filtering
-        return Response(serializer.data)
+    def get(self, request, user_id=None):
+        if user_id:
+            user = get_object_or_404(Users, id=user_id)
+            serializer = UserProfileSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            users = Users.objects.all()
+            serializer = UserProfileSerializer(users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         user = request.user
-        # Handle file uploads and data separately to avoid pickling errors
         data = {}
         files = {}
-        
-        # Safely extract data fields
+
         for key in request.data:
             if key in request.FILES:
                 files[key] = request.FILES[key]
             else:
                 data[key] = request.data[key]
-        
-        # Print the data for debugging
+
         print("Received data:", data)
-        print("Received files:", files)
-        
-        # Handle project_image_url and project_image specially
-        if 'project_image_url' in data:
-            # Remove project_image_url from data as it's not needed for saving
-            data.pop('project_image_url')
-        
-        # If project_image is a string but not a file, remove it
-        if 'project_image' in data and not isinstance(data['project_image'], (list, tuple)) and not data['project_image'].startswith('data:'):
-            try:
-                # Check if it's a JSON string
-                import json
-                json_data = json.loads(data['project_image'])
-                # If it's an empty object or list, remove it
-                if not json_data or (isinstance(json_data, list) and len(json_data) == 0):
-                    data.pop('project_image')
-            except:
-                # If it's not valid JSON, keep it (might be a file path)
-                pass
-        
-        # Remove project_image if it's a string representation of an empty array or object
-        if 'project_image' in data and isinstance(data['project_image'], str):
-            if data['project_image'] in ['[]', '{}', '[{}]']:
-                data.pop('project_image')
-        
-        # Create a serializer with both data and files
-        serializer = UserProfileSerializer(user, data=data, partial=True)
-        
+        print("Received files keys:", files.keys())
+
+        serializer_data = data.copy()
+        for key, value in files.items():
+            serializer_data[key] = value
+
+        serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
+
         if serializer.is_valid():
-            # Save the data fields
-            instance = serializer.save()
-            
-            # Handle file fields separately
-            for key, file in files.items():
-                setattr(instance, key, file)
-            
-            # Save again if there were files
-            if files:
-                instance.save()
-            
+            print("Serializer validated_data:", serializer.validated_data)
+            serializer.save()
             return Response({
-                'message': 'Profile updated successfully',
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
+                "message": "Profile updated successfully",
+                "data": UserProfileSerializer(user).data
+            })
         else:
             print("Serializer errors:", serializer.errors)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request):
-        user = request.user
+    def put(self, request, user_id=None):
+        user_id = user_id or request.query_params.get('user_id')
+        if not user_id:
+            return Response({"error": "user_id is required"}, status=400)
+        user = get_object_or_404(Users, id=user_id)
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
+    
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+    
         return Response(serializer.errors, status=400)
 
+
+    
+
+class DropdownAPIView(APIView):
+    def get(self, request):
+        dropdown_type = request.query_params.get('type')
+
+        if dropdown_type == 'services':
+            data = Service_drop_down.objects.all()
+            serializer = Service_drop_down_serializers(data, many=True)
+            return Response(serializer.data)
+
+        elif dropdown_type == 'jobpositions':
+            data = JobPosition.objects.all()
+            serializer = JobPositionserializers(data, many=True)
+            return Response(serializer.data)
+
+        return Response({'detail': 'Invalid type'}, status=status.HTTP_400_BAD_REQUEST)
+
+class SkillsDropdownAPIView(APIView):
+    def get(self, request):
+        category_filter = request.query_params.get('category')
+        print(category_filter)
+
+        if category_filter:
+            try:
+                category = ToolsSkillsCategory.objects.get(name__iexact=category_filter)
+                serializer = Tools_Skills_serializers(category)
+                return Response(serializer.data)
+            except ToolsSkillsCategory.DoesNotExist:
+                # Show available categories in the error response
+                categories = list(ToolsSkillsCategory.objects.values_list('name', flat=True))
+                return Response({
+                    'detail': 'Category not found',
+                    'available_categories': categories
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            data = ToolsSkillsCategory.objects.prefetch_related('skills').all()
+            serializer = Tools_Skills_serializers(data, many=True)
+            return Response(serializer.data)
 
 class UserSearchFilterView(APIView):
     permission_classes = [AllowAny]  # Change to IsAuthenticated if needed
@@ -134,7 +159,7 @@ class UserSearchFilterView(APIView):
         language = request.GET.get('language')
         sort_by = request.GET.get('sort_by')  # e.g., 'rating' or 'first_name'
 
-        users = Users.objects.all()
+        users = UserProfileSerializer.objects.all()
 
         # Filtering
         if query:
@@ -164,158 +189,144 @@ class UserSearchFilterView(APIView):
         serializer = UserProfileSerializer(users, many=True)
         return Response(serializer.data)
 
+logger = logging.getLogger(__name__)
+class profile_share_actions(APIView):
+   
+    def get(self, request):
+        action = request.query_params.get('action')
+        user_id = request.query_params.get('user_id')
 
+        # 1. Verify Profile via Share Token
+        if action == 'verify':
+            token = request.query_params.get('token')
+            try:
+                token = uuid.UUID(token)
+                share = ProfileShare.objects.select_related('user').get(share_token=token)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def verify_profile_share(request, token):
-    try:
-        # Convert string token to UUID if needed
-        if isinstance(token, str):
-            token = uuid.UUID(token)
+                if timezone.now() > share.expires_at:
+                    return Response({'error': 'This link has expired'}, status=status.HTTP_400_BAD_REQUEST)
+
+                serializer = PublicProfileSerializer(share.user)
+                return Response({
+                    'profile': serializer.data,
+                    'share_token': str(share.share_token)
+                })
+
+            except (ProfileShare.DoesNotExist, ValueError, TypeError):
+                return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 3. Get All Reviews for Specific User (user_id-based)
+        elif action == 'get_reviews':
+            if not user_id:
+                return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                user = Users.objects.get(id=user_id)
+            except Users.DoesNotExist:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            reviews = Review.objects.filter(user=user).order_by('-created_at')
+            serializer = ReviewSerializer(reviews, many=True)
+            return Response(serializer.data)
+
+        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        action = request.data.get('action')
+        user_id = request.data.get('user_id')
+
+        # 2. Generate Profile Share Link and Send Email (user_id-based)
+        if action == 'generate':
+            if not user_id:
+                return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             
-        share = ProfileShare.objects.select_related('user').get(share_token=token)
-        
-        # Check if share is expired
-        if timezone.now() > share.expires_at:
-            return Response(
-                {'error': 'This link has expired'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Serialize the profile data
-        serializer = PublicProfileSerializer(share.user)
-        return Response({
-            'profile': serializer.data,
-            'share_token': str(share.share_token)
-        })
-        
-    except (ProfileShare.DoesNotExist, ValueError, TypeError):
-        return Response(
-            {'error': 'Invalid share token'},
-            status=status.HTTP_404_NOT_FOUND
-        )
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def generate_profile_share(request):
-    user = request.user
-    recipient_email = request.data.get('email')
-    
-    if not recipient_email:
-        return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Generate share token
-    share_token = user.generate_share_link(recipient_email)
-    
-    # Send email with share link
-    verification_url = f"{settings.FRONTEND_URL}/verify-profile/{share_token}"
-    
-    try:
-        # Context for the template
-        context = {
-            'user_name': user.name,
-            'verification_url': verification_url
-        }
-        
-        # Render HTML content from template
-        html_content = render_to_string('emails/profile_share.html', context)
-        
-        # Create a simple text version from the HTML for email clients that don't support HTML
-        # This is automatically handled by EmailMessage
-        
-        subject = f"Profile Review Request from {user.name}"
-        from_email = settings.EMAIL_HOST_USER
-        
-        # Send email with HTML content
-        email = EmailMessage(
-            subject=subject,
-            body=html_content,
-            from_email=from_email,
-            to=[recipient_email],
-        )
-        email.content_subtype = "html"  # Set the primary content to be HTML
-        email.send(fail_silently=False)
-        
-        return Response({
-            'message': 'Share link sent successfully',
-            'share_token': share_token,
-            'verification_url': verification_url
-        })
-        
-    except Exception as e:
-        # Log the error for debugging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Email sending failed: {str(e)}")
-        
-        # Still return success since the share link was created
-        return Response({
-            'message': 'Share link created but email sending failed. Please share the link manually.',
-            'share_token': share_token,
-            'verification_url': verification_url
-        }, status=status.HTTP_201_CREATED)        
-    except UserProfileSerializer.DoesNotExist:
-        return Response(
-            {'error': 'Profile not found'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+            try:
+                user = Users.objects.get(id=user_id)
+            except Users.DoesNotExist:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-@api_view(['POST'])
-def submit_review(request, token):
-    try:
-        # Get the share object and validate it
-        share = ProfileShare.objects.get(share_token=token)
-        if not share.is_valid():
-            return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create review data using the user from the share object
-        review_data = {
-            'user': share.user.id,  # Changed from 'profile' to 'user'
-            'reviewer_name': request.data.get('reviewer_name'),
-            'rating': request.data.get('rating'),
-            'comment': request.data.get('comment')
-        }
-        
-        # Validate that required fields are present
-        if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
-            return Response({
-                'error': 'reviewer_name, rating, and comment are required fields'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        serializer = ReviewSerializer(data=review_data)
-        if serializer.is_valid():
-            review = serializer.save()
-            return Response({
-                'message': 'Review submitted successfully',
-                'review': ReviewSerializer(review).data
-            }, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-    except ProfileShare.DoesNotExist:
-        return Response({
-            'error': 'Invalid share token'
-        }, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error submitting review: {str(e)}")
-        return Response({
-            'error': 'An error occurred while submitting the review'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            recipient_email = request.data.get('email')
+            if not recipient_email:
+                return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_reviews(request):
-    # Get the current user
-    user = request.user
-    
-    # Get all reviews for this user
-    reviews = Review.objects.filter(user=user).order_by('-created_at')
-    
-    # Serialize and return the reviews
-    serializer = ReviewSerializer(reviews, many=True)
-    return Response(serializer.data)
+            share_token = user.generate_share_link(recipient_email)
+            verification_url = f"{settings.FRONTEND_URL}/share/{share_token}"
+
+
+
+
+            try:
+                context = {
+                    'user_name': user.name,
+                    'verification_url': verification_url
+                }
+                html_content = render_to_string('emails/profile_share.html', context)
+
+                subject = f"Profile Review Request from {user.name}"
+                email = EmailMessage(
+                    subject=subject,
+                    body=html_content,
+                    from_email=settings.EMAIL_HOST_USER,
+                    to=[recipient_email],
+                )
+                email.content_subtype = "html"
+                email.send(fail_silently=False)
+
+                return Response({
+                    'message': 'Share link sent successfully',
+                    'share_token': share_token,
+                    'verification_url': verification_url
+                })
+
+            except Exception as e:
+                logger.error(f"Email sending failed: {str(e)}")
+                return Response({
+                    'message': 'Share link created but email sending failed. Please share the link manually.',
+                    'share_token': share_token,
+                    'verification_url': verification_url
+                }, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+
+class submit_profile_review(APIView):
+    permission_classes = [AllowAny]  # Public access via token
+
+    def post(self, request):
+        token = request.data.get('share_token')
+        try:
+            share = ProfileShare.objects.get(share_token=token)
+
+            if not share.is_valid():
+                return Response({'error': 'Link expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get user from the share object (user_id is internal)
+            review_data = {
+                'user': share.user.id,
+                'reviewer_name': request.data.get('reviewer_name'),
+                'rating': request.data.get('rating'),
+                'comment': request.data.get('comment')
+            }
+
+            if not all([review_data['reviewer_name'], review_data['rating'], review_data['comment']]):
+                return Response({
+                    'error': 'reviewer_name, rating, and comment are required fields'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = ReviewSerializer(data=review_data)
+            if serializer.is_valid():
+                review = serializer.save()
+                return Response({
+                    'message': 'Review submitted successfully',
+                    'review': ReviewSerializer(review).data
+                }, status=status.HTTP_201_CREATED)
+
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except ProfileShare.DoesNotExist:
+            return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error submitting review: {str(e)}")
+            return Response({'error': 'An error occurred while submitting the review'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CheckProfileStatusView(APIView):
     permission_classes = [IsAuthenticated]
@@ -375,31 +386,36 @@ class CheckProfileStatusView(APIView):
             next_steps.append("Add your skills")
         
         return next_steps
-
 class UploadVerificationDocumentView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-    
+
     def post(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')  # Get user ID from query params
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)  # Replace with your actual user model
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         doc_type = request.data.get('document_type')
-        
         if not doc_type or doc_type not in ['gov_id', 'address']:
             return Response({'error': 'Invalid document type'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         if 'document' not in request.FILES:
             return Response({'error': 'No document provided'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         document = request.FILES['document']
-        
+
         if doc_type == 'gov_id':
             user.gov_id_document = document
         elif doc_type == 'address':
             user.address_document = document
-            
+
         user.save()
-        
-        # Return updated verification status
+
         return Response({
             'message': f'{doc_type.replace("_", " ").title()} document uploaded successfully',
             'verification_status': user.verification_status
@@ -407,25 +423,44 @@ class UploadVerificationDocumentView(APIView):
 
 class RequestMobileVerificationView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
-        user = request.user
+        user_id = request.data.get('user_id')
         mobile = request.data.get('mobile')
-        
+
+        if not user_id:
+            return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
         if not mobile:
             return Response({'error': 'Mobile number is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Prevent sending OTP to Twilio number itself
+        if mobile == settings.TWILIO_PHONE_NUMBER:
+            return Response({
+                'error': 'Cannot send OTP to Twilio phone number itself.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Update user's mobile number
         user.mobile = mobile
         user.save()
-        
-        # Generate OTP
+
+        # Generate a 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        
-        # Store OTP in session
-        request.session['mobile_otp'] = otp
-        request.session['mobile_to_verify'] = mobile
-        
+
+        # Store OTP in database instead of session
+        user.otp = otp
+        user.otp_created_at = timezone.now()
+        user.save()
+
+        # Debug logging
+        print(f"Debug - Generated OTP: {otp}")
+        print(f"Debug - Stored OTP in database for user: {user.id}")
+
         try:
             # Send OTP via Twilio
             client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
@@ -434,42 +469,96 @@ class RequestMobileVerificationView(APIView):
                 from_=settings.TWILIO_PHONE_NUMBER,
                 to=mobile
             )
-            
+
             return Response({
                 'message': 'Verification code sent to your mobile number',
                 'sid': message.sid
             })
+
         except Exception as e:
             logging.error(f"Twilio error: {str(e)}")
             return Response({
                 'error': 'Failed to send verification code',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 class VerifyMobileOTPView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
+    def generate_otp(self):
+        return str(random.randint(100000, 999999))
+
+    def send_sms(self, mobile, otp):
+        try:
+            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            message = f"Your OTP for verification is {otp}"
+
+            client.messages.create(
+                body=message,
+                from_=settings.TWILIO_PHONE_NUMBER,
+                to=mobile  # Ensure mobile number is in E.164 format (e.g., +917010319399)
+            )
+        except Exception as e:
+            print("Twilio Error:", str(e))
+
     def post(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        resend = request.data.get('resend', False)
+        now = timezone.now()
+
+        if resend:
+            last_sent_time = user.otp_created_at
+
+            if last_sent_time:
+                elapsed = (now - last_sent_time).total_seconds()
+                if elapsed < 45:
+                    return Response({
+                        'error': 'Please wait before resending OTP',
+                        'seconds_remaining': int(45 - elapsed)
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+            # Resend OTP
+            new_otp = self.generate_otp()
+            user.otp = new_otp
+            user.otp_created_at = now
+            user.save()
+
+            self.send_sms(user.mobile, new_otp)
+
+            return Response({'message': 'OTP resent successfully'}, status=status.HTTP_200_OK)
+
+        # Regular OTP verification
         otp = request.data.get('otp')
-        
-        stored_otp = request.session.get('mobile_otp')
-        mobile_to_verify = request.session.get('mobile_to_verify')
-        
-        if not stored_otp or not mobile_to_verify:
+        stored_otp = user.otp
+        otp_created_at = user.otp_created_at
+
+        # Debug logging
+        print(f"Debug - Received OTP: {otp}")
+        print(f"Debug - Stored OTP from database: {stored_otp}")
+        print(f"Debug - OTP created at: {otp_created_at}")
+
+        if not stored_otp or not otp_created_at:
             return Response({'error': 'No verification in progress'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        # Check if OTP is expired (15 minutes)
+        if timezone.now() - otp_created_at > timezone.timedelta(minutes=15):
+            return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
+
         if otp != stored_otp:
             return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        # Verify the mobile number
+
         user.mobile_verified = True
+        user.otp = None  # Clear OTP after successful verification
+        user.otp_created_at = None
         user.save()
-        
-        # Clear session data
-        del request.session['mobile_otp']
-        del request.session['mobile_to_verify']
-        
+
         return Response({
             'message': 'Mobile number verified successfully',
             'verification_status': user.verification_status
@@ -479,7 +568,15 @@ class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        user = request.user
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         return Response({
             'verification_status': user.verification_status,
             'gov_id_verified': user.gov_id_verified,
@@ -507,47 +604,189 @@ class GetVerificationStatusView(APIView):
             }
         })
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def admin_document_approval_webhook(request):
-    """
-    Webhook for admin document approval notifications.
-    This can be called from admin actions or other admin interfaces.
-    """
-    user_id = request.data.get('user_id')
-    document_type = request.data.get('document_type')
-    is_approved = request.data.get('is_approved', False)
-    
-    if not user_id or not document_type:
-        return Response({
-            'error': 'Missing required parameters'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        user = Users.objects.get(id=user_id)
-        
-        if document_type == 'gov_id':
-            user.gov_id_verified = is_approved
-        elif document_type == 'address':
-            user.address_verified = is_approved
-        else:
+class admin_document_approval_webhook(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Webhook for admin document approval notifications.
+        This can be called from admin actions or other admin interfaces.
+        """
+        user_id = request.data.get('user_id')
+        document_type = request.data.get('document_type')
+        is_approved = request.data.get('is_approved', False)
+
+        if not user_id or not document_type:
             return Response({
-                'error': 'Invalid document type'
+                'error': 'Missing required parameters'
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+
+            if document_type == 'gov_id':
+                user.gov_id_verified = is_approved
+            elif document_type == 'address':
+                user.address_verified = is_approved
+            else:
+                return Response({
+                    'error': 'Invalid document type'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            user.save(update_fields=[f'{document_type}_verified'])
+
+            # Send notification email
+            user.send_verification_status_email(document_type, is_approved)
+
+            return Response({
+                'success': True,
+                'message': f'{document_type.replace("_", " ").title()} {"approved" if is_approved else "rejected"} successfully',
+                'user_id': str(user.id),
+                'verification_status': user.verification_status
+            })
+
+        except Users.DoesNotExist:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+logger = logging.getLogger(__name__)
+
+class UsersearchApiview(APIView):
+    def get(self, request):
+        try:
+            offset = int(request.GET.get('offset', 0))
+            limit = int(request.GET.get('limit',20))
+            search = request.GET.get('search', '').strip()
+            min_rating = int(request.GET.get('min_rating', 1))
+
+            queryset = Users.objects.prefetch_related('client_reviews').annotate(
+                max_individual_rating=Max('client_reviews__rating'),
+                total_reviews=Count('client_reviews'),
+                avg_rating=Avg('client_reviews__rating')
+            )
+
+            #  Apply min_rating only if there is a rating
+            queryset = queryset.filter(
+                Q(max_individual_rating_isnull=True) | Q(max_individual_rating_gte=min_rating)
+            )
+
+            if search:
+                queryset = queryset.filter(
+                    Q(username__icontains=search) |
+                    Q(bio__icontains=search) |
+                    Q(primary_tools__icontains=search) |
+                    Q(technical_skills__icontains=search)
+                )
+
+            queryset = queryset.order_by('-max_individual_rating', '-avg_rating', '-total_reviews')
+
+            total_count = queryset.count()
+            if total_count == 0:
+                return Response({'success': True, 'data': []})
+
+            if offset >= total_count:
+                offset = offset % total_count
+
+            users = queryset[offset:offset + limit]
+            serializer = UsersearchSerializer(users, many=True)
+
+            return Response({
+                'success': True,
+                'data': serializer.data
+            })
+
+        except ValueError as e:
+            logger.error(f"ValueError in UsersearchApiview: {e}")
+            return Response({
+                'success': False,
+                'error': 'Invalid parameter values',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error in UsersearchApiview: {e}")
+            return Response({
+                'success': False,
+                'error': 'Internal server error',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteItemView(APIView):
+    def delete(self, request, model_name, pk):
+        model_map = {
+            'experience': Experiences,
+            'certification': Certification,
+            'category': ServiceCategory,
+            'portfolio': Portfolio
+        }
+
+        model_class = model_map.get(model_name.lower())
+        if not model_class:
+            return Response({'error': 'Invalid model name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            instance = model_class.objects.get(pk=pk)
+            instance.delete()
+            return Response({'message': f'{model_name} with ID {pk} deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except model_class.DoesNotExist:
+            return Response({'error': f'{model_name} not found'}, status=status.HTTP_404_NOT_FOUND)
+
+def serve_media(request, path):
+    try:
+        # Clean the path
+        path = unquote(path)
         
-        user.save(update_fields=[f'{document_type}_verified'])
+        # If path starts with blob:, remove it and any extra slashes
+        if path.startswith('blob:'):
+            path = path.replace('blob:', '').lstrip('/')
         
-        # Send notification email
-        user.send_verification_status_email(document_type, is_approved)
-        
-        return Response({
-            'success': True,
-            'message': f'{document_type.replace("_", " ").title()} {"approved" if is_approved else "rejected"} successfully',
-            'user_id': str(user.id),
-            'verification_status': user.verification_status
-        })
-        
-    except Users.DoesNotExist:
-        return Response({
-            'error': 'User not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+        # Handle regular media files
+        if settings.DEFAULT_FILE_STORAGE == 'storages.backends.s3boto3.S3Boto3Storage':
+            # For S3 storage
+            file_url = default_storage.url(path)
+            return HttpResponse(file_url)
+        else:
+            # For local storage
+            file_path = os.path.join(settings.MEDIA_ROOT, path)
+            if os.path.exists(file_path):
+                content_type, _ = mimetypes.guess_type(file_path)
+                return FileResponse(open(file_path, 'rb'), content_type=content_type)
+            return HttpResponse('File not found', status=404)
+
+    except Exception as e:
+        return HttpResponse(f'Error serving media: {str(e)}', status=500)
+
+class BlobMediaView(View):
+    def get(self, request, path=None, *args, **kwargs):
+        try:
+            # Get the URL from either the path or query parameter
+            url = path or request.GET.get('url')
+            if not url:
+                return HttpResponse('No URL provided', status=400)
+
+            # Clean the URL
+            url = unquote(url)
+            
+            # Remove blob: prefix if present
+            if url.startswith('blob:'):
+                url = url.replace('blob:', '').lstrip('/')
+            
+            # Fetch the content
+            response = requests.get(url)
+            if response.status_code != 200:
+                return HttpResponse('Failed to fetch content', status=400)
+
+            # Get the content type
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            
+            # Create a BytesIO object from the content
+            content = BytesIO(response.content)
+            
+            # Return the file response
+            return FileResponse(content, content_type=content_type)
+
+        except Exception as e:
+            return HttpResponse(f'Error processing request: {str(e)}', status=500)

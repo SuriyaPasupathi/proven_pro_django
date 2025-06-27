@@ -18,3 +18,14 @@ stripe
 python-decouple
 pytest-django
 mysql-connector-python
+gunicorn
+redis
+django-redis
+django-filter
+psycopg2-binary
+pytz
+whitenoise
+requests
+boto3
+django-storages
+twilio

@@ -15,6 +15,8 @@ from datetime import timedelta
 from decouple import config
 
 import os
+from .storage_backends import MediaStorage, StaticStorage
+from storages.backends.s3boto3 import S3Boto3Storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,9 +29,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+
 
 # Application definition
 
@@ -45,7 +47,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'rest_framework_simplejwt',
     'corsheaders',
-    
+    'storages',
 ]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173"
@@ -55,11 +57,59 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Add CORS allowed headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cache-control',
+    'pragma'
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     
+}
+#Use Amazon S3 for media storage
+DEFAULT_FILE_STORAGE = 'proven_pro.storage_backends.MediaStorage'
+
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
+
+
+
+
+
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_VERIFY = True
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+MEDIA_ROOT = 'media/'
+
+
+
+# Storage class mappings
+STORAGE_CLASSES = {
+    'media': 'proven_pro.storage_backends.MediaStorage',
+    'profile_pics': 'proven_pro.storage_backends.ProfilePicStorage',
+    'verification_docs': 'proven_pro.storage_backends.VerificationDocStorage',
+    'videos': 'proven_pro.storage_backends.VideoStorage',
+    'certifications': 'proven_pro.storage_backends.CertificationStorage',
+    'project_images': 'proven_pro.storage_backends.ProjectImageStorage',
 }
 
 MIDDLEWARE = [
@@ -114,14 +164,16 @@ DATABASES = {
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
+        'HOST': config('DB_HOST', default='db1'),
         'PORT': config('DB_PORT', default='3306'),
     }
 }
 
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# # Static files configuration
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -158,8 +210,6 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = 'static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -208,8 +258,12 @@ LOGGING = {
 }
 
 
-PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
-PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
+# TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+# TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+# TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
+
+# PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY')
+# PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY')
 
 # Add these settings for CSRF
 CSRF_COOKIE_SAMESITE = 'Lax'  # Use 'None' if your frontend is on a different domain
@@ -217,10 +271,17 @@ CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_COOKIE_HTTPONLY = False  # False allows JavaScript to access the cookie
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
 
-# Twilio settings
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
+# Session configuration
+SESSION_COOKIE_SAMESITE = 'Lax'  # Use 'None' if your frontend is on a different domain
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = False  # False allows JavaScript to access the cookie
+SESSION_COOKIE_AGE = 3600  # 1 hour session timeout
+SESSION_SAVE_EVERY_REQUEST = True  # Save session on every request
+
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER')
 
 
-
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'e75d-103-186-120-4.ngrok-free.app', '13.213.131.66','provenpro.net',
+    'www.provenpro.net']
