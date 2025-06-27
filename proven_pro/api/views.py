@@ -189,7 +189,7 @@ class UserSearchFilterView(APIView):
         serializer = UserProfileSerializer(users, many=True)
         return Response(serializer.data)
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 class profile_share_actions(APIView):
    
     def get(self, request):
@@ -651,7 +651,7 @@ class admin_document_approval_webhook(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 class UsersearchApiview(APIView):
     def get(self, request):
