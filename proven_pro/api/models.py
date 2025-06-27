@@ -34,6 +34,14 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 
+
+
+def profile_pic_upload_path(instance, filename):
+    return f"{instance.id}/{filename}"
+
+def video_intro_upload_path(instance, filename):
+    return f"video_intros/{instance.id}/{filename}"
+
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -57,7 +65,12 @@ class Users(AbstractUser):
     last_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(blank=True)
     profile_mail = models.EmailField(unique=True, blank=True, null=True)
-    profile_pic = models.ImageField( storage=ProfilePicStorage, null=True, blank=True)
+    profile_pic = models.ImageField(
+    upload_to=profile_pic_upload_path,
+    storage=ProfilePicStorage(),
+    null=True,
+    blank=True
+)
     rating = models.FloatField(default=0)
 
     mobile = models.CharField(max_length=20, blank=True)
@@ -67,7 +80,12 @@ class Users(AbstractUser):
     soft_skills = models.TextField(blank=True)
     skills_description = models.TextField(blank=True)
 
-    video_intro = models.FileField(storage=VideoStorage, null=True, blank=True)
+    video_intro = models.FileField(
+    upload_to=video_intro_upload_path,
+    storage=VideoStorage(),
+    null=True,
+    blank=True
+)
     video_description = models.TextField(blank=True)
 
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
@@ -157,6 +175,9 @@ class Experiences(models.Model):
     experience_end_date = models.DateField(null=True, blank=True)
 
 
+
+def certification_image_upload_path(instance, filename):
+    return f"{instance.user.id}/{filename}"
 class Certification(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='certifications')
@@ -165,7 +186,13 @@ class Certification(models.Model):
     certifications_issued_date = models.DateField()
     certifications_expiration_date = models.DateField(null=True, blank=True)
     certifications_id = models.TextField(blank=True)
-    certifications_image = models.ImageField(upload_to='certifications/', storage=CertificationStorage, null=True, blank=True)
+    certifications_image = models.ImageField(
+        upload_to=certification_image_upload_path,
+        storage=CertificationStorage(),
+        null=True,
+        blank=True
+    )
+    
     certifications_image_url = models.URLField(blank=True, null=True)
 
 
@@ -177,15 +204,20 @@ class ServiceCategory(models.Model):
     rate_range = models.CharField(max_length=100, blank=True)
     availability = models.TextField(blank=True)
 
-
+def project_image_upload_path(instance, filename):
+    return f"{instance.user.id}/{filename}"
 class Portfolio(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='projects')
     project_title = models.CharField(max_length=100)
     project_description = models.TextField(blank=True)
     project_url = models.URLField(blank=True)
-    project_image = models.ImageField(upload_to='project_images/', storage=ProjectImageStorage, null=True, blank=True)
-
+    project_image = models.ImageField(
+        upload_to=project_image_upload_path,
+        storage=ProjectImageStorage(),
+        null=True,
+        blank=True
+    )
 
 class SocialLink(models.Model):
     PLATFORM_CHOICES = [
