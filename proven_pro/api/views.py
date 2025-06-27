@@ -720,7 +720,7 @@ class DeleteItemView(APIView):
             'experience': Experiences,
             'certification': Certification,
             'category': ServiceCategory,
-            'portfolio': Portfolio
+            'project': Portfolio
         }
 
         model_class = model_map.get(model_name.lower())
