@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'storages',
 ]
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173"
+    "http://localhost:5173","https://www.provenpro.net","https://provepro.net",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
@@ -118,14 +118,14 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Make sure this is before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     # Comment out or remove the CSRF middleware if you're using JWT for all API endpoints
-    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'proven_pro.urls'
-
+d
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
