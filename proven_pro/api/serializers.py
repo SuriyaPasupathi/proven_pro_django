@@ -31,7 +31,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         except Exception:
             raise serializers.ValidationError("Email is invalid.")
 
-        pattern = r'^[a-z][a-z0-9._]*[0-9]@gmail\.com$'
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.fullmatch(pattern, value):
             raise serializers.ValidationError("Email must be a valid Gmail address (e.g., abc123@gmail.com).")
 
