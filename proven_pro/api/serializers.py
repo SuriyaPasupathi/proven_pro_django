@@ -4,49 +4,58 @@ from django.contrib.auth.password_validation import validate_password
 from .models import SocialLink, Review, ProfileShare,Experiences, Certification, ServiceCategory, Portfolio,JobPosition,Service_drop_down,Skill,ToolsSkillsCategory
 import re
 import json
+from django.contrib.auth.validators import UnicodeUsernameValidator
 import logging
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
+from django.conf import settings
 
 Users = get_user_model()
 
 class RegisterSerializer(serializers.ModelSerializer):
+    # Override the username field to remove default UnicodeUsernameValidator
+    username = serializers.CharField(
+        required=True,
+        max_length=150,
+        validators=[]  
+    )
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = Users
         fields = ('username', 'email', 'password')
-    
+
     def validate_email(self, value):
         try:
             validate_email(value)
-        except DjangoValidationError:
-            raise serializers.ValidationError("email is invalid")
+        except Exception:
+            raise serializers.ValidationError("Email is invalid.")
 
         pattern = r'^[a-z][a-z0-9._]*[0-9]@gmail\.com$'
         if not re.fullmatch(pattern, value):
-            raise serializers.ValidationError("email is invalid")
+            raise serializers.ValidationError("Email must be a valid Gmail address (e.g., abc123@gmail.com).")
 
         if Users.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")
-
         return value
-    
+
     def validate_username(self, value):
-        # Check if username already exists
+        if " " in value:
+            raise serializers.ValidationError("Username cannot contain spaces. Use letters, numbers, or underscores.")
+
+        if not re.fullmatch(r'^[A-Za-z0-9_]+$', value):
+            raise serializers.ValidationError("Username must contain only letters, numbers, or underscores.")
+
         if Users.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with that username already exists.")
+            raise serializers.ValidationError("This username is already taken.")
         return value
 
     def create(self, validated_data):
-        # Create the user with validated data
-        user = Users.objects.create_user(
+        return Users.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password']
         )
-        return user
- 
 # Forgot Password
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -93,12 +102,15 @@ class work_experiences_Serializer(serializers.ModelSerializer):
 
 
 class CertificationSerializer(serializers.ModelSerializer):
+  
     
     class Meta:
         model = Certification
         fields = ('id', 'certifications_name', 'certifications_issuer', 'certifications_issued_date', 'certifications_expiration_date', 'certifications_id', 
                   'certifications_image_url','certifications_image')
         # Remove 'user' from fields  to avoid circular reference
+
+
 
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
@@ -185,7 +197,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     video_intro = serializers.FileField(write_only=True, required=False)
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
     video_intro_url = serializers.SerializerMethodField(read_only=True)
+    
 
+   
     class Meta:
         model = Users
         fields = (
@@ -212,6 +226,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_video_intro_url(self, obj):
         return obj.video_intro.url if obj.video_intro else None
+   
 
     def validate(self, data):
         self.work_experiences_data = self.initial_data.get('work_experiences')
@@ -242,6 +257,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if 'video_intro' in validated_data:
             instance.video_intro = validated_data['video_intro']
         instance.save()
+        
 
         # Handle Experiences
         if self.work_experiences_data:
@@ -317,6 +333,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Portfolio.objects.filter(id__in=deleted_proj_ids, user=instance).delete()
 
 
+       
         # Handle Certifications
         if self.certifications_data:
             try:
@@ -346,7 +363,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
                         )
             except Exception as e:
                 print(f"Certification Error: {e}")
-
         # Handle Categories
         categories_data = self.categories_data
         if isinstance(categories_data, str):

@@ -16,7 +16,7 @@ import logging  # Add this import
 from django.conf import settings
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
-from .models import Users
+from .models import Users,ProfileShare
 import random
 from datetime import timedelta
 from django.utils import timezone
@@ -168,30 +168,22 @@ class RegisterViewSet(viewsets.ViewSet):
 
     def create(self, request):
         try:
-            username = request.data.get('username')
-            email = request.data.get('email')
-
-            if Users.objects.filter(username=username).exists() or Users.objects.filter(email=email).exists():
-                error_response = {"error": "Account already exists", "details": {}}
-                if Users.objects.filter(username=username).exists():
-                    error_response["details"]["username"] = ["A user with that username already exists."]
-                if Users.objects.filter(email=email).exists():
-                    error_response["details"]["email"] = ["A user with this email already exists."]
-                return Response(error_response, status=status.HTTP_400_BAD_REQUEST)
-
             serializer = RegisterSerializer(data=request.data)
-            if not serializer.is_valid():
-                return Response({"error": "Validation failed", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-            validated_data = serializer.validated_data
-            user = Users.objects.create_user(**validated_data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            user = serializer.save()
             user.is_verified = False
+            user.save()
+
             self._generate_and_send_otp(user)
 
             return Response({
                 "message": "OTP sent to your email. Please enter it to complete registration.",
                 "email": user.email
             }, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -313,7 +305,8 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
-        otp = request.data.get("otp")  # <- optional OTP field
+        otp = request.data.get("otp")
+        resend = request.data.get("resend", False)
 
         if not email:
             return Response({"detail": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -322,11 +315,21 @@ class LoginView(APIView):
         if not user:
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # ✅ If user is not verified and OTP is provided
+        # ✅ Resend OTP (via resend flag)
+        if resend and not user.is_verified:
+            self._generate_and_send_otp(user)
+            return Response({
+                "detail": "OTP has been resent to your email.",
+                "status": "otp_resent",
+                "email": user.email
+            }, status=status.HTTP_200_OK)
+
+        # ✅ OTP verification via login
         if not user.is_verified and otp:
             if str(user.otp) == str(otp):
                 user.is_verified = True
                 user.otp = None
+                user.otp_created_at = None
                 user.save()
 
                 refresh = RefreshToken.for_user(user)
@@ -334,60 +337,51 @@ class LoginView(APIView):
                     "message": "OTP verified. Login successful!",
                     "access": str(refresh.access_token),
                     "refresh": str(refresh),
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name
-                    },
+                    "user": self._user_data(user),
                     "subscription_type": user.subscription_type,
                     "has_profile": self._has_profile(user)
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({"detail": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ If user is not verified and no OTP provided → Resend OTP
+        # ✅ If not verified and no otp, send OTP
         if not user.is_verified:
-            self._resend_otp(user)
+            self._generate_and_send_otp(user)
             return Response({
                 "detail": "Account not verified. OTP sent to your email.",
                 "status": "otp_required",
                 "email": user.email
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # ✅ If user is verified, check password
+        # ✅ Standard login
         if user.check_password(password):
             refresh = RefreshToken.for_user(user)
             return Response({
                 "message": "Login successful!",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name
-                },
+                "user": self._user_data(user),
                 "subscription_type": user.subscription_type,
                 "has_profile": self._has_profile(user)
             }, status=status.HTTP_200_OK)
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    def _resend_otp(self, user):
-        """Helper to generate and send OTP via email"""
+    def _generate_and_send_otp(self, user):
         otp_code = str(random.randint(100000, 999999))
         user.otp = otp_code
+        user.otp_created_at = timezone.now()
         user.save()
 
         try:
+            verify_link = f"{settings.FRONTEND_URL}/check-email-code?email={user.email}"
             context = {
                 'username': user.username,
                 'email': user.email,
-                'otp_code': otp_code
+                'otp_code': otp_code,
+                'verify_link': verify_link
             }
+
             html_content = render_to_string('emails/otp_email.html', context)
 
             email = EmailMultiAlternatives(
@@ -398,12 +392,23 @@ class LoginView(APIView):
             )
             email.attach_alternative(html_content, "text/html")
             email.send()
-            print(f"Resent OTP to {user.email}: {otp_code}")
+            print(f"Sent OTP {otp_code} to {user.email}")
         except Exception as e:
             print(f"OTP send failed: {str(e)}")
 
+    def _user_data(self, user):
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "profile_url": user.profile_url
+        }
+
     def _has_profile(self, user):
         return bool(user.first_name and user.last_name and getattr(user, 'job_title', None))
+
 #password reset
 class RequestResetPasswordView(APIView):
     def post(self, request):
@@ -590,8 +595,10 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            refresh_token = request.data.get("refresh")
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response({"detail": "Logout successful."}, status=status.HTTP_200_OK)
