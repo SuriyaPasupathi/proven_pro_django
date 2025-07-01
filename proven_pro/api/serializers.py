@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import SocialLink, Review, ProfileShare,Experiences, Certification, ServiceCategory, Portfolio,JobPosition,Service_drop_down,Skill,ToolsSkillsCategory
+from .models import SocialLink, Review, ProfileShare,Experiences, Certification, ServiceCategory, Portfolio,JobPosition,Service_drop_down,Skill,ToolsSkillsCategory,VideoIntro
 import re
 import json
 from django.contrib.auth.validators import UnicodeUsernameValidator
@@ -77,6 +77,32 @@ class UserSerializer(serializers.ModelSerializer):
         model = Users
         fields = ('id', 'username', 'email', 'first_name', 'last_name')
 
+class UserSerializer(serializers.ModelSerializer):
+    video_file = serializers.FileField(write_only=True, required=False)  # accept just the video upload
+
+    class Meta:
+        model = Users
+        fields = ['id', 'username', 'email', 'video_file']  # include other fields as needed
+
+    def update(self, instance, validated_data):
+        video_file = validated_data.pop('video_file', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # ✅ Handle video_intro relationship
+        if video_file:
+            if instance.video_intro:
+                instance.video_intro.video = video_file
+                instance.video_intro.save()
+            else:
+                from .models import VideoIntro  # import VideoIntro if needed
+                video_intro = VideoIntro.objects.create(user=instance, video=video_file)
+                instance.video_intro = video_intro
+                instance.save()
+
+        return instance
 
 class SocialLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -217,8 +243,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
-            'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
-            'mobile_verified', 'verification_status'
+             'verification_status'
         )
 
     def get_profile_pic_url(self, obj):
