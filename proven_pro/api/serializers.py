@@ -77,32 +77,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = Users
         fields = ('id', 'username', 'email', 'first_name', 'last_name')
 
-class UserSerializer(serializers.ModelSerializer):
-    video_file = serializers.FileField(write_only=True, required=False)  # accept just the video upload
 
-    class Meta:
-        model = Users
-        fields = ['id', 'username', 'email', 'video_file']  # include other fields as needed
-
-    def update(self, instance, validated_data):
-        video_file = validated_data.pop('video_file', None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        # ✅ Handle video_intro relationship
-        if video_file:
-            if instance.video_intro:
-                instance.video_intro.video = video_file
-                instance.video_intro.save()
-            else:
-                from .models import VideoIntro  # import VideoIntro if needed
-                video_intro = VideoIntro.objects.create(user=instance, video=video_file)
-                instance.video_intro = video_intro
-                instance.save()
-
-        return instance
 
 class SocialLinkSerializer(serializers.ModelSerializer):
     class Meta:
