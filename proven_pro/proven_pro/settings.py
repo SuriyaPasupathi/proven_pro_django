@@ -125,7 +125,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'proven_pro.urls'
-d
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
