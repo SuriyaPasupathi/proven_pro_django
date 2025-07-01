@@ -27,7 +27,8 @@ from .views import (
     UsersearchApiview,
     DeleteItemView,
     serve_media,
-    BlobMediaView
+    BlobMediaView,
+    DeleteVideoIntroView
 )
 
 router = DefaultRouter()
@@ -44,6 +45,7 @@ urlpatterns = [
     path('dropdown/', DropdownAPIView.as_view(), name='dropdown'),
     path('skills-dropdown/', SkillsDropdownAPIView.as_view(), name='skills-dropdown'),
     path('delete/<str:model_name>/<uuid:pk>/', DeleteItemView.as_view()),
+    path('delete-video-intro/<uuid:user_id>/', DeleteVideoIntroView.as_view(), name='delete-video-intro'),
 
     #auth
     path('google-auth/', google_auth.as_view(), name='google-auth'),

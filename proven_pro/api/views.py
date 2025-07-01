@@ -734,6 +734,31 @@ class DeleteItemView(APIView):
         except model_class.DoesNotExist:
             return Response({'error': f'{model_name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
+
+
+class DeleteVideoIntroView(APIView):
+   
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, user_id):
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.video_intro:
+            return Response({'error': 'No video intro to delete.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Delete file from storage
+        user.video_intro.delete(save=False)
+
+        # ✅ Clear file & description
+        user.video_intro = None
+        user.video_description = ""
+        user.save()
+
+        return Response({'message': 'Video intro deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
 def serve_media(request, path):
     try:
         # Clean the path
