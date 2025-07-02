@@ -42,6 +42,12 @@ def profile_pic_upload_path(instance, filename):
 def video_intro_upload_path(instance, filename):
     return f"video_intros/{instance.id}/{filename}"
 
+def gov_id_upload_path(instance, filename):
+    return f"gov_id/{instance.id}/{filename}"
+
+def address_upload_path(instance, filename):
+    return f"address/{instance.id}/{filename}"
+
 class Users(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -90,9 +96,19 @@ class Users(AbstractUser):
 
     profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
 
-    gov_id_document = models.FileField(upload_to='gov_id/', storage=VerificationDocStorage, null=True, blank=True)
+    gov_id_document = models.FileField(
+    upload_to=gov_id_upload_path,
+    storage=VerificationDocStorage,
+    null=True,
+    blank=True
+)
     gov_id_verified = models.BooleanField(default=False)
-    address_document = models.FileField(upload_to='address/', storage=VerificationDocStorage, null=True, blank=True)
+    address_document = models.FileField(
+    upload_to=address_upload_path,
+    storage=VerificationDocStorage,
+    null=True,
+    blank=True
+)
     address_verified = models.BooleanField(default=False)
     mobile_verified = models.BooleanField(default=False)
     verification_percentage = models.IntegerField(default=0)
