@@ -566,42 +566,26 @@ class VerifyMobileOTPView(APIView):
 
 class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         user_id = request.query_params.get('user_id')
         if not user_id:
-            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'user_id is required'}, status=400)
 
         try:
             user = Users.objects.get(id=user_id)
         except Users.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'User not found'}, status=404)
 
         return Response({
+            'user_id': user.id,
             'verification_status': user.verification_status,
             'gov_id_verified': user.gov_id_verified,
             'address_verified': user.address_verified,
             'mobile_verified': user.mobile_verified,
             'has_gov_id_document': bool(user.gov_id_document),
             'has_address_document': bool(user.address_document),
-            'mobile': user.mobile,
-            'verification_details': {
-                'government_id': {
-                    'uploaded': bool(user.gov_id_document),
-                    'verified': user.gov_id_verified,
-                    'percentage': 50 if user.gov_id_verified else 0
-                },
-                'address_proof': {
-                    'uploaded': bool(user.address_document),
-                    'verified': user.address_verified,
-                    'percentage': 25 if user.address_verified else 0
-                },
-                'mobile': {
-                    'provided': bool(user.mobile),
-                    'verified': user.mobile_verified,
-                    'percentage': 25 if user.mobile_verified else 0
-                }
-            }
+            'mobile': user.mobile
         })
 
 class admin_document_approval_webhook(APIView):
