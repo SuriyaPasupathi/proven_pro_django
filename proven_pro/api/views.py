@@ -566,7 +566,7 @@ class VerifyMobileOTPView(APIView):
 
 class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         user_id = request.query_params.get('user_id')
         if not user_id:
@@ -577,29 +577,51 @@ class GetVerificationStatusView(APIView):
         except Users.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        gov_id_verified = user.gov_id_status == 'approved'
+        address_verified = user.address_status == 'approved'
+        mobile_verified = user.mobile_status == 'approved'
+
+        # Total percentage calculation
+        percentage = 0
+        if gov_id_verified:
+            percentage += 50
+        if address_verified:
+            percentage += 25
+        if mobile_verified:
+            percentage += 25
+
         return Response({
-            'verification_status': user.verification_status,
-            'gov_id_verified': user.gov_id_verified,
-            'address_verified': user.address_verified,
-            'mobile_verified': user.mobile_verified,
+            'verification_percentage': percentage,
+            'gov_id_status': user.gov_id_status,
+            'address_status': user.address_status,
+            'mobile_status': user.mobile_status,
+
+            'gov_id_verified': gov_id_verified,
+            'address_verified': address_verified,
+            'mobile_verified': mobile_verified,
+
             'has_gov_id_document': bool(user.gov_id_document),
             'has_address_document': bool(user.address_document),
             'mobile': user.mobile,
+
             'verification_details': {
                 'government_id': {
                     'uploaded': bool(user.gov_id_document),
-                    'verified': user.gov_id_verified,
-                    'percentage': 50 if user.gov_id_verified else 0
+                    'verified': gov_id_verified,
+                    'status': user.gov_id_status,
+                    'percentage': 50 if gov_id_verified else 0
                 },
                 'address_proof': {
                     'uploaded': bool(user.address_document),
-                    'verified': user.address_verified,
-                    'percentage': 25 if user.address_verified else 0
+                    'verified': address_verified,
+                    'status': user.address_status,
+                    'percentage': 25 if address_verified else 0
                 },
                 'mobile': {
                     'provided': bool(user.mobile),
-                    'verified': user.mobile_verified,
-                    'percentage': 25 if user.mobile_verified else 0
+                    'verified': mobile_verified,
+                    'status': user.mobile_status,
+                    'percentage': 25 if mobile_verified else 0
                 }
             }
         })
