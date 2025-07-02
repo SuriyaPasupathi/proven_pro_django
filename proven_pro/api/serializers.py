@@ -218,7 +218,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
-             'verification_status'
+            'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
+            'mobile_verified','verification_status'
         )
 
     def get_profile_pic_url(self, obj):
