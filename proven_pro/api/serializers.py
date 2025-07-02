@@ -41,14 +41,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_username(self, value):
         if " " in value:
-            raise serializers.ValidationError("Username cannot contain spaces. Use letters, numbers, or underscores.")
-
-        if not re.fullmatch(r'^[A-Za-z0-9_]+$', value):
-            raise serializers.ValidationError("Username must contain only letters, numbers, or underscores.")
+            raise serializers.ValidationError("Username cannot contain spaces.")
 
         if Users.objects.filter(username=value).exists():
             raise serializers.ValidationError("This username is already taken.")
         return value
+    
+      
 
     def create(self, validated_data):
         return Users.objects.create_user(
