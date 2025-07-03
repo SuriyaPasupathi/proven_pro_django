@@ -35,9 +35,9 @@ class UsersAdmin(admin.ModelAdmin):
         ('Verification', {
             'fields': (
                 'verification_percentage',
-                ('gov_id_document', 'view_gov_id', 'gov_id_status'),
-                ('address_document', 'view_address_doc', 'address_status'),
-                ('mobile', 'mobile_status')
+                ('gov_id_document', 'view_gov_id', 'gov_id_verified'),
+                ('address_document', 'view_address_doc', 'address_verified'),
+                ('mobile'),
             )
         }),
     )
@@ -57,8 +57,8 @@ class UsersAdmin(admin.ModelAdmin):
     def approve_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.gov_id_document and user.gov_id_status != 'approved':
-                user.gov_id_status = 'approved'
+            if user.gov_id_document and user.gov_id_verified != 'approved':
+                user.gov_id_verified = 'approved'
                 user.save()
                 user.send_verification_status_email('gov_id', True)
                 updated += 1
@@ -67,8 +67,8 @@ class UsersAdmin(admin.ModelAdmin):
     def approve_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.address_document and user.address_status != 'approved':
-                user.address_status = 'approved'
+            if user.address_document and user.address_verified != 'approved':
+                user.address_verified = 'approved'
                 user.save()
                 user.send_verification_status_email('address', True)
                 updated += 1
@@ -77,8 +77,8 @@ class UsersAdmin(admin.ModelAdmin):
     def reject_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.gov_id_status != 'rejected':
-                user.gov_id_status = 'rejected'
+            if user.gov_id_verified != 'rejected':
+                user.gov_id_verified = 'rejected'
                 user.save()
                 user.send_verification_status_email('gov_id', False)
                 updated += 1
@@ -87,8 +87,8 @@ class UsersAdmin(admin.ModelAdmin):
     def reject_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.address_status != 'rejected':
-                user.address_status = 'rejected'
+            if user.address_verified != 'rejected':
+                user.address_verified = 'rejected'
                 user.save()
                 user.send_verification_status_email('address', False)
                 updated += 1

@@ -580,9 +580,9 @@ class GetVerificationStatusView(APIView):
         except Users.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        gov_id_verified = user.gov_id_status == 'approved'
-        address_verified = user.address_status == 'approved'
-        mobile_verified = user.mobile_status == 'approved'
+        gov_id_verified = user.gov_id_verified == 'approved'
+        address_verified = user.address_verified == 'approved'
+        mobile_verified = user.mobile_verified
 
         # Total percentage calculation
         percentage = 0
@@ -595,10 +595,6 @@ class GetVerificationStatusView(APIView):
 
         return Response({
             'verification_percentage': percentage,
-            'gov_id_status': user.gov_id_status,
-            'address_status': user.address_status,
-            'mobile_status': user.mobile_status,
-
             'gov_id_verified': gov_id_verified,
             'address_verified': address_verified,
             'mobile_verified': mobile_verified,
@@ -611,19 +607,15 @@ class GetVerificationStatusView(APIView):
                 'government_id': {
                     'uploaded': bool(user.gov_id_document),
                     'verified': gov_id_verified,
-                    'status': user.gov_id_status,
                     'percentage': 50 if gov_id_verified else 0
                 },
                 'address_proof': {
                     'uploaded': bool(user.address_document),
                     'verified': address_verified,
-                    'status': user.address_status,
                     'percentage': 25 if address_verified else 0
                 },
                 'mobile': {
-                    'provided': bool(user.mobile),
                     'verified': mobile_verified,
-                    'status': user.mobile_status,
                     'percentage': 25 if mobile_verified else 0
                 }
             }

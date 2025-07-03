@@ -98,13 +98,11 @@ class Users(AbstractUser):
     address_document = models.FileField(upload_to='address/', storage=VerificationDocStorage, null=True, blank=True)
     address_verified = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')], default='pending')
 
-    mobile_status = models.CharField(
-    max_length=20,
-    choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')],
-    default='pending'
-)
-    def mobile_verified(self):
-        return self.mobile_status=='approved'
+    mobile_verified = models.BooleanField(default=False)
+
+
+    # def mobile_verified(self):
+    #     return self.mobile_verified=='approved'
 
    
     verification_percentage = models.IntegerField(default=0)
@@ -112,15 +110,13 @@ class Users(AbstractUser):
     @property
     def verification_status(self):
         score = 0
-        if self.gov_id_status == 'approved':
+        if self.gov_id_verified == 'approved':
             score += 50
-        if self.address_status == 'approved':
+        if self.address_verified == 'approved':
             score += 25
-        if self.mobile_status == 'approved':
+        if self.mobile_verified == 'approved':
             score += 25
         return score
-
-
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -294,10 +290,10 @@ class ProfileShare(models.Model):
 def handle_verification_status_change(sender, instance, **kwargs):
     update_fields = kwargs.get('update_fields')
     if update_fields:
-        if 'gov_id_status' in update_fields:
-            instance.send_verification_status_email('gov_id', instance.gov_id_status == 'approved')
-        if 'address_status' in update_fields:
-            instance.send_verification_status_email('address', instance.address_status == 'approved')
+        if 'gov_id_verified' in update_fields:
+            instance.send_verification_status_email('gov_id', instance.gov_id_verified == 'approved')
+        if 'address_verified' in update_fields:
+            instance.send_verification_status_email('address', instance.address_verified == 'approved')
 
 
 

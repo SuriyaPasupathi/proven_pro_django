@@ -158,14 +158,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     certifications = CertificationSerializer(many=True, read_only=True)
     categories = ServiceCategorySerializer(many=True, read_only=True)
     portfolio = PortfolioSerializer(many=True, read_only=True, source='projects')
+    mobile_verified = serializers.BooleanField(read_only=True)
+
 
     # Computed fields
     profile_pic_url = serializers.SerializerMethodField(read_only=True)
     video_intro_url = serializers.SerializerMethodField(read_only=True)
-    gov_id_status = serializers.SerializerMethodField(read_only=True)
-    address_status = serializers.SerializerMethodField(read_only=True)
-
-    mobile_status = serializers.SerializerMethodField()
+    
 
     # Write-only fields
     work_experiences_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -216,8 +215,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
-            'gov_id_document','gov_id_status', 'address_document', 'address_status',
-            'mobile_status', 'verification_status'
+            'gov_id_document','gov_id_verified', 'address_document','address_verified','mobile_verified', 'verification_status'
 
         )
 
@@ -228,22 +226,22 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return obj.video_intro.url if obj.video_intro else None
 
     def get_gov_id_verified(self, obj):
-        return obj.gov_id_status == 'approved'
+        return obj.gov_id_verified == 'approved'
 
     def get_address_verified(self, obj):
-        return obj.address_status == 'approved'
+        return obj.address_verified == 'approved'
 
     def get_mobile_verified(self, obj):
         return obj.mobile_verified  # Assuming this is a real BooleanField in the model
 
-    def get_gov_id_status(self, obj):
-        return obj.gov_id_status or 'pending'
+    def get_gov_id_verified(self, obj):
+        return obj.gov_id_verified or 'pending'
 
-    def get_address_status(self, obj):
-        return obj.address_status or 'pending'
+    def get_address_verified(self, obj):
+        return obj.address_verified or 'pending'
     
-    def get_mobile_status(self, obj):
-        return obj.mobile_status or 'pending'
+    def get_mobile_verified(self, obj):
+        return obj.mobile_verified or 'pending'
 
 
     # validate() and update() methods remain unchanged
