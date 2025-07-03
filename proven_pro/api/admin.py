@@ -19,11 +19,12 @@ class ToolsSkillsCategoryAdmin(admin.ModelAdmin):
     inlines = [SkillInline]
 
 class UsersAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'subscription_type', 'verification_status_display')
+    list_display = ('email', 'first_name', 'last_name', 'gov_id_status', 'address_status')
     search_fields = ('email', 'first_name', 'last_name')
-    list_filter = ('subscription_type', 'gov_id_verified', 'address_verified', 'mobile_verified')
+    list_filter = ('is_verified', 'gov_id_status', 'address_status')
     readonly_fields = ('verification_percentage', 'view_gov_id', 'view_address_doc')
     actions = ['approve_gov_id', 'approve_address_proof', 'reject_gov_id', 'reject_address_proof']
+
     fieldsets = (
         ('Basic Info', {
             'fields': ('email', 'first_name', 'last_name', 'username', 'profile_pic')
@@ -33,23 +34,13 @@ class UsersAdmin(admin.ModelAdmin):
         }),
         ('Verification', {
             'fields': (
-                'verification_percentage', 
-                ('gov_id_document', 'view_gov_id', 'gov_id_verified'),
-                ('address_document', 'view_address_doc', 'address_verified'),
-                ('mobile', 'mobile_verified')
+                'verification_percentage',
+                ('gov_id_document', 'view_gov_id', 'gov_id_status'),
+                ('address_document', 'view_address_doc', 'address_status'),
+                ('mobile', 'mobile_status')
             )
         }),
     )
-
-    def verification_status_display(self, obj):
-        percentage = obj.verification_status
-        color = 'red'
-        if percentage >= 75:
-            color = 'green'
-        elif percentage >= 50:
-            color = 'orange'
-        return format_html('<span style="color: {};">{}</span>', color, f"{percentage}% Verified")
-    verification_status_display.short_description = 'Verification'
 
     def view_gov_id(self, obj):
         if obj.gov_id_document:
@@ -62,12 +53,12 @@ class UsersAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" target="_blank">View Document</a>', obj.address_document.url)
         return "No document uploaded"
     view_address_doc.short_description = 'View Address Proof'
-    
+
     def approve_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.gov_id_document and not user.gov_id_verified:
-                user.gov_id_verified = True
+            if user.gov_id_document and user.gov_id_status != 'approved':
+                user.gov_id_status = 'approved'
                 user.save()
                 user.send_verification_status_email('gov_id', True)
                 updated += 1
@@ -76,8 +67,8 @@ class UsersAdmin(admin.ModelAdmin):
     def approve_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.address_document and not user.address_verified:
-                user.address_verified = True
+            if user.address_document and user.address_status != 'approved':
+                user.address_status = 'approved'
                 user.save()
                 user.send_verification_status_email('address', True)
                 updated += 1
@@ -86,8 +77,8 @@ class UsersAdmin(admin.ModelAdmin):
     def reject_gov_id(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.gov_id_verified:
-                user.gov_id_verified = False
+            if user.gov_id_status != 'rejected':
+                user.gov_id_status = 'rejected'
                 user.save()
                 user.send_verification_status_email('gov_id', False)
                 updated += 1
@@ -96,8 +87,8 @@ class UsersAdmin(admin.ModelAdmin):
     def reject_address_proof(self, request, queryset):
         updated = 0
         for user in queryset:
-            if user.address_verified:
-                user.address_verified = False
+            if user.address_status != 'rejected':
+                user.address_status = 'rejected'
                 user.save()
                 user.send_verification_status_email('address', False)
                 updated += 1

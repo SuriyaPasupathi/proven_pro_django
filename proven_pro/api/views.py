@@ -31,6 +31,7 @@ from django.core.paginator import Paginator
 from django.views import View
 from urllib.parse import unquote
 import mimetypes
+from datetime import timedelta
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from io import BytesIO
@@ -57,12 +58,21 @@ class UserProfileView(APIView):
     def get(self, request, user_id=None):
         if user_id:
             user = get_object_or_404(Users, id=user_id)
-            serializer = UserProfileSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
-            users = Users.objects.all()
-            serializer = UserProfileSerializer(users, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            user = request.user
+
+        # ✅ Regenerate share_token and profile_url only in GET
+        share = ProfileShare.objects.create(
+            user=user,
+            share_token=uuid.uuid4(),
+            expires_at=timezone.now() + timedelta(days=1)
+        )
+        profile_url = f"{settings.FRONTEND_URL}/share/{share.share_token}"
+        user.profile_url = profile_url
+        user.save(update_fields=["profile_url"])
+
+        serializer = UserProfileSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         user = request.user
@@ -75,9 +85,6 @@ class UserProfileView(APIView):
             else:
                 data[key] = request.data[key]
 
-        print("Received data:", data)
-        print("Received files keys:", files.keys())
-
         serializer_data = data.copy()
         for key, value in files.items():
             serializer_data[key] = value
@@ -85,30 +92,26 @@ class UserProfileView(APIView):
         serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
 
         if serializer.is_valid():
-            print("Serializer validated_data:", serializer.validated_data)
             serializer.save()
             return Response({
                 "message": "Profile updated successfully",
                 "data": UserProfileSerializer(user).data
-            })
+            }, status=status.HTTP_200_OK)
         else:
-            print("Serializer errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request, user_id=None):
         user_id = user_id or request.query_params.get('user_id')
         if not user_id:
             return Response({"error": "user_id is required"}, status=400)
+
         user = get_object_or_404(Users, id=user_id)
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
-    
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-    
         return Response(serializer.errors, status=400)
-
-
     
 
 class DropdownAPIView(APIView):
@@ -191,13 +194,15 @@ class UserSearchFilterView(APIView):
 
 logger = logging.getLogger(__name__)
 class profile_share_actions(APIView):
-   
+
     def get(self, request):
         action = request.query_params.get('action')
         user_id = request.query_params.get('user_id')
+        print("sdhfsndf",action)
 
-        # 1. Verify Profile via Share Token
+        # ✅ 1. View Public Profile (no token used)
         if action == 'verify':
+            print(action)
             token = request.query_params.get('token')
             try:
                 token = uuid.UUID(token)
@@ -215,16 +220,18 @@ class profile_share_actions(APIView):
             except (ProfileShare.DoesNotExist, ValueError, TypeError):
                 return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
 
-        # 3. Get All Reviews for Specific User (user_id-based)
+
+        # ✅ 2. Get All Reviews for a Specific User
         elif action == 'get_reviews':
             if not user_id:
                 return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
             try:
                 user = Users.objects.get(id=user_id)
             except Users.DoesNotExist:
                 return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-            reviews = Review.objects.filter(user=user).order_by('-created_at')
+            reviews = user.client_reviews.order_by('-created_at')
             serializer = ReviewSerializer(reviews, many=True)
             return Response(serializer.data)
 
@@ -234,31 +241,28 @@ class profile_share_actions(APIView):
         action = request.data.get('action')
         user_id = request.data.get('user_id')
 
-        # 2. Generate Profile Share Link and Send Email (user_id-based)
+        # ✅ 3. Send profile_url via email (no token)
         if action == 'generate':
             if not user_id:
-                return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
+                return Response({'error': 'user_id is required'}, status=400)
 
             try:
                 user = Users.objects.get(id=user_id)
             except Users.DoesNotExist:
-                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'User not found'}, status=404)
 
             recipient_email = request.data.get('email')
             if not recipient_email:
-                return Response({'error': 'Recipient email is required'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Recipient email is required'}, status=400)
 
-            share_token = user.generate_share_link(recipient_email)
-            verification_url = f"{settings.FRONTEND_URL}/share/{share_token}"
-
-
-
+            # ✅ Ensure profile_url is available
+            if not user.profile_url:
+                return Response({'error': 'Profile URL not available. Please update profile first.'}, status=400)
 
             try:
                 context = {
                     'user_name': user.name,
-                    'verification_url': verification_url
+                    'profile_url': user.profile_url
                 }
                 html_content = render_to_string('emails/profile_share.html', context)
 
@@ -273,20 +277,19 @@ class profile_share_actions(APIView):
                 email.send(fail_silently=False)
 
                 return Response({
-                    'message': 'Share link sent successfully',
-                    'share_token': share_token,
-                    'verification_url': verification_url
+                    'message': 'Profile URL sent successfully via email',
+                    'profile_url': user.profile_url
                 })
 
             except Exception as e:
                 logger.error(f"Email sending failed: {str(e)}")
                 return Response({
-                    'message': 'Share link created but email sending failed. Please share the link manually.',
-                    'share_token': share_token,
-                    'verification_url': verification_url
-                }, status=status.HTTP_201_CREATED)
+                    'message': 'Email failed. Please share the profile URL manually.',
+                    'profile_url': user.profile_url
+                }, status=201)
 
-        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Invalid action or method'}, status=400)
+
 
 class submit_profile_review(APIView):
     permission_classes = [AllowAny]  # Public access via token
@@ -567,25 +570,63 @@ class VerifyMobileOTPView(APIView):
 class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
+
     def get(self, request):
         user_id = request.query_params.get('user_id')
         if not user_id:
-            return Response({'error': 'user_id is required'}, status=400)
-
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             user = Users.objects.get(id=user_id)
         except Users.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        gov_id_verified = user.gov_id_status == 'approved'
+        address_verified = user.address_status == 'approved'
+        mobile_verified = user.mobile_status == 'approved'
+
+        # Total percentage calculation
+        percentage = 0
+        if gov_id_verified:
+            percentage += 50
+        if address_verified:
+            percentage += 25
+        if mobile_verified:
+            percentage += 25
 
         return Response({
-            'user_id': user.id,
-            'verification_status': user.verification_status,
-            'gov_id_verified': user.gov_id_verified,
-            'address_verified': user.address_verified,
-            'mobile_verified': user.mobile_verified,
+            'verification_percentage': percentage,
+            'gov_id_status': user.gov_id_status,
+            'address_status': user.address_status,
+            'mobile_status': user.mobile_status,
+
+            'gov_id_verified': gov_id_verified,
+            'address_verified': address_verified,
+            'mobile_verified': mobile_verified,
+
             'has_gov_id_document': bool(user.gov_id_document),
             'has_address_document': bool(user.address_document),
-            'mobile': user.mobile
+            'mobile': user.mobile,
+
+            'verification_details': {
+                'government_id': {
+                    'uploaded': bool(user.gov_id_document),
+                    'verified': gov_id_verified,
+                    'status': user.gov_id_status,
+                    'percentage': 50 if gov_id_verified else 0
+                },
+                'address_proof': {
+                    'uploaded': bool(user.address_document),
+                    'verified': address_verified,
+                    'status': user.address_status,
+                    'percentage': 25 if address_verified else 0
+                },
+                'mobile': {
+                    'provided': bool(user.mobile),
+                    'verified': mobile_verified,
+                    'status': user.mobile_status,
+                    'percentage': 25 if mobile_verified else 0
+                }
+            }
         })
 
 class admin_document_approval_webhook(APIView):

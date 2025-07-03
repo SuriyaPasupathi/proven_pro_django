@@ -159,26 +159,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
     categories = ServiceCategorySerializer(many=True, read_only=True)
     portfolio = PortfolioSerializer(many=True, read_only=True, source='projects')
 
+    # Computed fields
+    profile_pic_url = serializers.SerializerMethodField(read_only=True)
+    video_intro_url = serializers.SerializerMethodField(read_only=True)
+    gov_id_status = serializers.SerializerMethodField(read_only=True)
+    address_status = serializers.SerializerMethodField(read_only=True)
+
+    mobile_status = serializers.SerializerMethodField()
+
     # Write-only fields
     work_experiences_data = serializers.CharField(write_only=True, required=False, allow_blank=True)
     linkedin = serializers.URLField(write_only=True, required=False, allow_blank=True)
     facebook = serializers.URLField(write_only=True, required=False, allow_blank=True)
     twitter = serializers.URLField(write_only=True, required=False, allow_blank=True)
 
-    # Experience fields
     company_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     position = serializers.CharField(write_only=True, required=False, allow_blank=True)
     experience_start_date = serializers.DateField(write_only=True, required=False)
     experience_end_date = serializers.DateField(write_only=True, required=False)
     key_responsibilities = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    # Project fields
     project_title = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     project_url = serializers.URLField(write_only=True, required=False, allow_blank=True)
     project_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
 
-    # Certification fields
     certifications_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_issuer = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_issued_date = serializers.DateField(write_only=True, required=False)
@@ -186,20 +191,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     certifications_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
     certifications_image = serializers.ImageField(write_only=True, required=False)
 
-    # Service Category
     services_categories = serializers.CharField(write_only=True, required=False, allow_blank=True)
     services_description = serializers.CharField(write_only=True, required=False, allow_blank=True)
     rate_range = serializers.CharField(write_only=True, required=False, allow_blank=True)
     availability = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    # Media
     profile_pic = serializers.ImageField(write_only=True, required=False)
     video_intro = serializers.FileField(write_only=True, required=False)
-    profile_pic_url = serializers.SerializerMethodField(read_only=True)
-    video_intro_url = serializers.SerializerMethodField(read_only=True)
-    
 
-   
     class Meta:
         model = Users
         fields = (
@@ -217,8 +216,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'certifications_name', 'certifications_issuer', 'certifications_issued_date', 
             'certifications_expiration_date', 'certifications_id', 'certifications_image',
             'services_categories', 'services_description', 'rate_range', 'availability',
-            'gov_id_document', 'gov_id_verified', 'address_document', 'address_verified',
-            'mobile_verified','verification_status'
+            'gov_id_document','gov_id_status', 'address_document', 'address_status',
+            'mobile_status', 'verification_status'
+
         )
 
     def get_profile_pic_url(self, obj):
@@ -226,7 +226,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_video_intro_url(self, obj):
         return obj.video_intro.url if obj.video_intro else None
-   
+
+    def get_gov_id_verified(self, obj):
+        return obj.gov_id_status == 'approved'
+
+    def get_address_verified(self, obj):
+        return obj.address_status == 'approved'
+
+    def get_mobile_verified(self, obj):
+        return obj.mobile_verified  # Assuming this is a real BooleanField in the model
+
+    def get_gov_id_status(self, obj):
+        return obj.gov_id_status or 'pending'
+
+    def get_address_status(self, obj):
+        return obj.address_status or 'pending'
+    
+    def get_mobile_status(self, obj):
+        return obj.mobile_status or 'pending'
+
+
+    # validate() and update() methods remain unchanged
 
     def validate(self, data):
         self.work_experiences_data = self.initial_data.get('work_experiences')
