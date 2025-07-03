@@ -303,7 +303,7 @@ class Service_drop_down(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
 
-    def _str_(self):
+    def __str__(self):
         return self.name
 
 
@@ -311,8 +311,8 @@ class JobPosition(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=100)
 
-    def _str_(self):
-        return self.title
+    def __str__(self):
+        return self.title 
 
 
 class ToolsSkillsCategory(models.Model):
