@@ -93,10 +93,20 @@ class Users(AbstractUser):
     ]
 
     gov_id_document = models.FileField(upload_to='gov_id/', storage=VerificationDocStorage, null=True, blank=True)
-    gov_id_verified = models.BooleanField(default=False)
+    gov_id_verified = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')], default='pending')
+    
     address_document = models.FileField(upload_to='address/', storage=VerificationDocStorage, null=True, blank=True)
-    address_verified = models.BooleanField(default=False)
-    mobile_verified = models.BooleanField(default=False)
+    address_verified = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')], default='pending')
+
+    mobile_status = models.CharField(
+    max_length=20,
+    choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')],
+    default='pending'
+)
+    def mobile_verified(self):
+        return self.mobile_status=='approved'
+
+   
     verification_percentage = models.IntegerField(default=0)
 
     @property

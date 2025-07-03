@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import PlanDetails, UserSubscription
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.utils import timezone
 
 class CreateSubscriptionPayment(APIView):
     def post(self, request):
@@ -103,3 +105,22 @@ class SubscriptionCheck(APIView):
             "plan": subscription.plan.name,
             "created_at": subscription.created_at.isoformat()
         }, status=status.HTTP_200_OK)
+    
+
+class SubscribePlanView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        plan = request.data.get('plan')  # expects: 'free', 'standard', or 'premium'
+
+        if plan not in ['free', 'standard', 'premium']:
+            return Response({'error': 'Invalid subscription plan'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        user.subscription_type = plan
+        user.subscription_active = True
+        user.subscription_start_date = timezone.now()
+        user.subscription_end_date = timezone.now() + timezone.timedelta(days=30)
+        user.save()
+
+        return Response({'message': f'Subscribed to {plan.capitalize()} Plan'}, status=status.HTTP_200_OK)

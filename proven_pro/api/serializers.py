@@ -295,6 +295,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                     else:
                         Experiences.objects.create(
                             user=instance,
+                            
                             company_name=exp.get('company_name', ''),
                             position=exp.get('position', ''),
                             experience_start_date=exp.get('experience_start_date'),

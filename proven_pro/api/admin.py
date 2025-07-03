@@ -19,9 +19,9 @@ class ToolsSkillsCategoryAdmin(admin.ModelAdmin):
     inlines = [SkillInline]
 
 class UsersAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'gov_id_status', 'address_status')
+    list_display = ('email', 'first_name', 'last_name', 'gov_id_verified', 'address_verified')
     search_fields = ('email', 'first_name', 'last_name')
-    list_filter = ('is_verified', 'gov_id_status', 'address_status')
+    list_filter = ('is_verified', 'gov_id_verified', 'address_verified')
     readonly_fields = ('verification_percentage', 'view_gov_id', 'view_address_doc')
     actions = ['approve_gov_id', 'approve_address_proof', 'reject_gov_id', 'reject_address_proof']
 

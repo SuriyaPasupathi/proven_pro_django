@@ -7,7 +7,7 @@ from .auth_user import (
     PasswordResetConfirmView, LogoutView,AccountSettingsView
 )
 from .subscription import(
-   CreateSubscriptionPayment, RetrySubscriptionPayment, PayMayaWebhook)
+   CreateSubscriptionPayment, RetrySubscriptionPayment, PayMayaWebhook,SubscribePlanView)
 
 from .views import ( 
     UserProfileView,    
@@ -70,6 +70,7 @@ urlpatterns = [
     path('paymaya/subscribe/',CreateSubscriptionPayment.as_view ()),
     path('paymaya/retry/', RetrySubscriptionPayment.as_view()),
     path('paymaya/webhook/', PayMayaWebhook.as_view()),
+    path('subscribe/', SubscribePlanView.as_view(), name='subscribe-plan'),
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),
