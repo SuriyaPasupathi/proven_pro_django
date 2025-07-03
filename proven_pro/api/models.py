@@ -84,7 +84,7 @@ class Users(AbstractUser):
     video_intro = models.FileField(upload_to=video_intro_upload_path, storage=VideoStorage(), null=True, blank=True)
     video_description = models.TextField(blank=True)
 
-    profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    profile_url = models.CharField(max_length=255, unique=True, blank=True, null=True)
 
     VERIFICATION_STATUS_CHOICES = [
         ('pending', 'Pending'),
