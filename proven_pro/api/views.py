@@ -567,11 +567,11 @@ class VerifyMobileOTPView(APIView):
 class GetVerificationStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
+
     def get(self, request):
         user_id = request.query_params.get('user_id')
         if not user_id:
             return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             user = Users.objects.get(id=user_id)
         except Users.DoesNotExist:
