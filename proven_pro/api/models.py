@@ -94,7 +94,7 @@ class Users(AbstractUser):
 )
     video_description = models.TextField(blank=True)
 
-    profile_url = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    profile_url = models.CharField(max_length=255, unique=True, blank=True, null=True)
 
     gov_id_document = models.FileField(
     upload_to=gov_id_upload_path,

@@ -490,6 +490,7 @@ class PasswordResetConfirmView(APIView):
             return Response({"error": "User not found."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 class AccountSettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -515,14 +516,12 @@ class AccountSettingsView(APIView):
         if Users.objects.filter(email=new_email).exclude(id=user.id).exists():
             return Response({'error': 'Email is already in use'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Generate and save OTP
         otp_code = str(random.randint(100000, 999999))
         user.otp = otp_code
         user.temp_email = new_email
         user.otp_created_at = timezone.now()
         user.save()
 
-        # Send OTP to new email
         self._send_email_otp(new_email, otp_code, user)
 
         return Response({
@@ -543,7 +542,6 @@ class AccountSettingsView(APIView):
         if not user.temp_email:
             return Response({'error': 'No email change request found'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # OTP matched – update email
         user.email = user.temp_email
         user.temp_email = None
         user.otp = None
@@ -564,6 +562,9 @@ class AccountSettingsView(APIView):
         if not user.check_password(current_password):
             return Response({'error': 'Current password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if current_password == new_password:
+            return Response({'error': 'New password must be different from the current password'}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
 
@@ -575,22 +576,25 @@ class AccountSettingsView(APIView):
             context = {
                 'name': user.name if hasattr(user, 'name') else user.username,
                 'otp_code': otp_code,
-                }
+            }
             html_content = render_to_string('emails/email_change_otp.html', context)
             email_message = EmailMessage(
                 subject=subject,
                 body=html_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[email]
-                )
-            email_message.content_subtype = 'html'  # To send as HTML email
+            )
+            email_message.content_subtype = 'html'
             email_message.send(fail_silently=False)
 
-        except Exception as e:  # ✅ properly aligned with try
+        except Exception as e:
             import traceback
             print("Error sending OTP email:", str(e))
             print(traceback.format_exc())
+
+
 #Logout View
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
