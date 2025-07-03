@@ -7,8 +7,7 @@ from .auth_user import (
     PasswordResetConfirmView, LogoutView,AccountSettingsView
 )
 from .subscription import(
-    SubscriptionCheckView,
-    UpdateSubscriptionView,CreateGCashPaymentView,VerifyPaymentView,PayMongoWebhookView,GCashWebhookView,SubscribePlanView)
+   CreateSubscriptionPayment, RetrySubscriptionPayment, PayMayaWebhook)
 
 from .views import ( 
     UserProfileView,    
@@ -67,16 +66,10 @@ urlpatterns = [
     path('search-profiles/', UserSearchFilterView.as_view(), name='search-profiles'),
 
     # Updated subscription endpoints
-    path('update-subscription/', UpdateSubscriptionView.as_view(), name='update-subscription'),
-    # path('create-payment-intent/', CreatePaymentIntentView.as_view(), name='create-payment-intent'),
-    
 
-    path('subscribe/', SubscribePlanView.as_view(), name='subscribe-plan'),
-    path('create-gcash-payment/', CreateGCashPaymentView.as_view(), name='create-gcash-payment'),
-    path('gcash-webhook/', GCashWebhookView.as_view(), name='gcash-webhook'),
-    path('verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
-    path('paymongo-webhook/', PayMongoWebhookView.as_view(), name='paymongo-webhook'),
-    path('subscription-check/', SubscriptionCheckView.as_view(), name='subscription-check'),
+    path('paymaya/subscribe/',CreateSubscriptionPayment.as_view ()),
+    path('paymaya/retry/', RetrySubscriptionPayment.as_view()),
+    path('paymaya/webhook/', PayMayaWebhook.as_view()),
 
     # Verification endpoints
     path('upload-verification-document/', UploadVerificationDocumentView.as_view(), name='upload-verification-document'),

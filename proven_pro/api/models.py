@@ -358,5 +358,11 @@ class PlanDetails(models.Model):
 
     def __str__(self):
         return f"{self.get_plan_name_display()} - ${self.price}"
-
+    
+class UserSubscription(models.Model):
+    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    plan = models.ForeignKey(PlanDetails, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, default="pending")  # pending, paid, failed
+    request_reference = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
