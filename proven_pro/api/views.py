@@ -31,6 +31,8 @@ from django.core.paginator import Paginator
 from django.views import View
 from urllib.parse import unquote
 import mimetypes
+from django.utils import timezone
+import requests
 from datetime import timedelta
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -193,47 +195,25 @@ class UserSearchFilterView(APIView):
         return Response(serializer.data)
 
 logger = logging.getLogger(__name__)
-class profile_share_actions(APIView):
+class ProfileShareActions(APIView):
+    """
+    Handles public profile viewing, token verification, review fetching,
+    and share-by-email actions.
+    """
 
     def get(self, request):
         action = request.query_params.get('action')
         user_id = request.query_params.get('user_id')
-        print("sdhfsndf",action)
+        token = request.query_params.get('token')
 
-        # ✅ 1. View Public Profile (no token used)
         if action == 'verify':
-            print(action)
-            token = request.query_params.get('token')
-            try:
-                token = uuid.UUID(token)
-                share = ProfileShare.objects.select_related('user').get(share_token=token)
+            return self.verify_token(token)
 
-                if timezone.now() > share.expires_at:
-                    return Response({'error': 'This link has expired'}, status=status.HTTP_400_BAD_REQUEST)
+        elif action == 'view_mode':
+            return self.view_mode_profile(user_id)
 
-                serializer = PublicProfileSerializer(share.user)
-                return Response({
-                    'profile': serializer.data,
-                    'share_token': str(share.share_token)
-                })
-
-            except (ProfileShare.DoesNotExist, ValueError, TypeError):
-                return Response({'error': 'Invalid share token'}, status=status.HTTP_404_NOT_FOUND)
-
-
-        # ✅ 2. Get All Reviews for a Specific User
         elif action == 'get_reviews':
-            if not user_id:
-                return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-            try:
-                user = Users.objects.get(id=user_id)
-            except Users.DoesNotExist:
-                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            reviews = user.client_reviews.order_by('-created_at')
-            serializer = ReviewSerializer(reviews, many=True)
-            return Response(serializer.data)
+            return self.get_reviews(user_id)
 
         return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -241,55 +221,97 @@ class profile_share_actions(APIView):
         action = request.data.get('action')
         user_id = request.data.get('user_id')
 
-        # ✅ 3. Send profile_url via email (no token)
         if action == 'generate':
-            if not user_id:
-                return Response({'error': 'user_id is required'}, status=400)
-
-            try:
-                user = Users.objects.get(id=user_id)
-            except Users.DoesNotExist:
-                return Response({'error': 'User not found'}, status=404)
-
             recipient_email = request.data.get('email')
-            if not recipient_email:
-                return Response({'error': 'Recipient email is required'}, status=400)
+            return self.send_profile_email(user_id, recipient_email)
 
-            # ✅ Ensure profile_url is available
-            if not user.profile_url:
-                return Response({'error': 'Profile URL not available. Please update profile first.'}, status=400)
+        return Response({'error': 'Invalid action or method'}, status=status.HTTP_400_BAD_REQUEST)
 
-            try:
-                context = {
-                    'user_name': user.name,
-                    'profile_url': user.profile_url
-                }
-                html_content = render_to_string('emails/profile_share.html', context)
+    def verify_token(self, token):
+        try:
+            token = uuid.UUID(token)
+            share = ProfileShare.objects.select_related('user').get(share_token=token)
 
-                subject = f"Profile Review Request from {user.name}"
-                email = EmailMessage(
-                    subject=subject,
-                    body=html_content,
-                    from_email=settings.EMAIL_HOST_USER,
-                    to=[recipient_email],
-                )
-                email.content_subtype = "html"
-                email.send(fail_silently=False)
+            if timezone.now() > share.expires_at:
+                return Response({'error': 'This link has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
-                return Response({
-                    'message': 'Profile URL sent successfully via email',
-                    'profile_url': user.profile_url
-                })
+            serializer = PublicProfileSerializer(share.user)
+            return Response({
+                'profile': serializer.data,
+                'share_token': str(share.share_token)
+            }, status=status.HTTP_200_OK)
 
-            except Exception as e:
-                logger.error(f"Email sending failed: {str(e)}")
-                return Response({
-                    'message': 'Email failed. Please share the profile URL manually.',
-                    'profile_url': user.profile_url
-                }, status=201)
+        except (ProfileShare.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Invalid or expired share token'}, status=status.HTTP_404_NOT_FOUND)
 
-        return Response({'error': 'Invalid action or method'}, status=400)
+    def view_mode_profile(self, user_id):
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Optional: add if user.is_profile_public condition
+        serializer = PublicProfileSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get_reviews(self, user_id):
+        if not user_id:
+            return Response({'error': 'user_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        reviews = user.client_reviews.order_by('-created_at')
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def send_profile_email(self, user_id, recipient_email):
+        if not user_id or not recipient_email:
+            return Response({'error': 'user_id and email are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.profile_url:
+            return Response({'error': 'Profile URL not available. Please update profile first.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Render email content
+            context = {
+                'user_name': user.name,
+                'profile_url': user.profile_url
+            }
+            html_content = render_to_string('emails/profile_share.html', context)
+
+            # Send email
+            subject = f"Profile Review Request from {user.name}"
+            email = EmailMessage(
+                subject=subject,
+                body=html_content,
+                from_email=settings.EMAIL_HOST_USER,
+                to=[recipient_email],
+            )
+            email.content_subtype = "html"
+            email.send(fail_silently=False)
+
+            return Response({
+                'message': 'Profile URL sent successfully via email',
+                'profile_url': user.profile_url
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Email sending failed: {str(e)}")
+            return Response({
+                'message': 'Email failed. Please share the profile URL manually.',
+                'profile_url': user.profile_url
+            }, status=status.HTTP_201_CREATED)
 
 class submit_profile_review(APIView):
     permission_classes = [AllowAny]  # Public access via token
