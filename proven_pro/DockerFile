@@ -1,51 +1,30 @@
-# Use official Python image
-FROM python:3.11-slim
+FROM python:3.11-slim-buster
 
-# Set environment variables
+WORKDIR /app
+
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies
+# Install system dependencies for mysqlclient and general building
 RUN apt-get update && apt-get install -y \
-    default-libmysqlclient-dev \
+    gcc \
     build-essential \
-    default-mysql-client \
-    netcat-traditional \
+    default-libmysqlclient-dev \
     pkg-config \
-    python3-dev \
-    libmariadb-dev \
-    && rm -rf /var/lib/apt/lists/*
+    netcat \
+    dos2unix \
+    && apt-get clean
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir mysqlclient && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Create a non-root user first
-RUN useradd -m appuser
-
-# Create necessary directories and set permissions
-RUN mkdir -p /app/static /app/media && \
-    chown -R appuser:appuser /app/static /app/media
+COPY ./requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt --no-cache-dir
 
 # Copy project files
 COPY . .
 
-# Set ownership of all files to appuser
-RUN chown -R appuser:appuser /app
+# Convert script to Unix format and make it executable
+RUN dos2unix entrypoint.sh
+RUN chmod +x entrypoint.sh
 
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD nc -z db1 3306 || exit 1
-
-# Default command overridden by docker-compose.yml
-CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+ENTRYPOINT ["bash", "entrypoint.sh"]
