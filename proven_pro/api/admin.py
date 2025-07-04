@@ -19,27 +19,31 @@ class ToolsSkillsCategoryAdmin(admin.ModelAdmin):
     inlines = [SkillInline]
 
 class UsersAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'gov_id_verified', 'address_verified')
+    list_display = ('email', 'first_name', 'last_name')
     search_fields = ('email', 'first_name', 'last_name')
     list_filter = ('is_verified', 'gov_id_verified', 'address_verified')
     readonly_fields = ('verification_percentage', 'view_gov_id', 'view_address_doc')
     actions = ['approve_gov_id', 'approve_address_proof', 'reject_gov_id', 'reject_address_proof']
 
     fieldsets = (
-        ('Basic Info', {
-            'fields': ('email', 'first_name', 'last_name', 'username', 'profile_pic')
-        }),
-        ('Subscription', {
-            'fields': ('subscription_type', 'subscription_active', 'subscription_start_date', 'subscription_end_date')
-        }),
-        ('Verification', {
-            'fields': (
-                'verification_percentage',
-                ('gov_id_document', 'view_gov_id', 'gov_id_verified'),
-                ('address_document', 'view_address_doc', 'address_verified'),
-                ('mobile'),
-            )
-        }),
+    ('Basic Info', {
+        'fields': ('email', 'first_name', 'last_name', 'username', 'profile_pic')
+    }),
+    ('Subscription', {
+        'fields': ('subscription_type', 'subscription_active', 'subscription_start_date', 'subscription_end_date')
+    }),
+    ('Verification', {
+        'fields': (
+            'verification_percentage',
+            ('gov_id_document', 'view_gov_id', 'gov_id_verified'),
+            ('address_document', 'view_address_doc', 'address_verified'),
+            'mobile',
+        )
+    }),
+    ('Permissions', {
+        'fields': ('is_active', 'is_staff', 'user_permissions')
+    }),
+
     )
 
     def view_gov_id(self, obj):

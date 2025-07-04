@@ -521,7 +521,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Users
         fields = ('id', 'username', 'email', 
-            'first_name', 'last_name', 'bio',
+            'first_name', 'last_name', 'bio','subscription_type', 'subscription_active',
             'primary_tools', 'technical_skills', 'soft_skills', 'skills_description',
             'profile_pic', 'profile_pic_url', 'rating', 'profile_url', 'profile_mail', 'mobile',
             'social_links', 'client_reviews', 'work_experiences', 'certifications', 'categories', 'portfolio',
@@ -546,17 +546,23 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 class UsersearchSerializer(serializers.ModelSerializer):
     description = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
     bio = serializers.CharField()
     profile_pic = serializers.ImageField()
 
-
-
     class Meta:
         model = Users
-        fields = ('id', 'username', 'description', 'rating','bio', 'profile_pic')
+        fields = ('id', 'username', 'description', 'rating', 'total_reviews', 'avg_rating', 'bio', 'profile_pic')
 
     def get_description(self, obj):
         return obj.bio or "N/A"
 
     def get_rating(self, obj):
-        return obj.max_individual_rating or 0
+        return getattr(obj, 'max_individual_rating', 0) or 0
+
+    def get_total_reviews(self, obj):
+        return getattr(obj, 'total_reviews', 0) or 0
+
+    def get_avg_rating(self, obj):
+        return getattr(obj, 'avg_rating', 0) or 0

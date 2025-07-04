@@ -696,9 +696,12 @@ class UsersearchApiview(APIView):
     def get(self, request):
         try:
             offset = int(request.GET.get('offset', 0))
-            limit = int(request.GET.get('limit',20))
+            limit = int(request.GET.get('limit', 20))
             search = request.GET.get('search', '').strip()
             min_rating = int(request.GET.get('min_rating', 1))
+
+            # Ensure min_rating is between 1 and 5
+            min_rating = max(1, min(min_rating, 5))
 
             queryset = Users.objects.prefetch_related('client_reviews').annotate(
                 max_individual_rating=Max('client_reviews__rating'),
@@ -706,9 +709,9 @@ class UsersearchApiview(APIView):
                 avg_rating=Avg('client_reviews__rating')
             )
 
-            #  Apply min_rating only if there is a rating
+            # Apply min_rating only if there's a rating
             queryset = queryset.filter(
-                Q(max_individual_rating_isnull=True) | Q(max_individual_rating_gte=min_rating)
+                Q(max_individual_rating__isnull=True) | Q(max_individual_rating__gte=min_rating)
             )
 
             if search:
@@ -723,7 +726,7 @@ class UsersearchApiview(APIView):
 
             total_count = queryset.count()
             if total_count == 0:
-                return Response({'success': True, 'data': []})
+                return Response({'success': True, 'data': [], 'total_count': 0})
 
             if offset >= total_count:
                 offset = offset % total_count
@@ -733,7 +736,8 @@ class UsersearchApiview(APIView):
 
             return Response({
                 'success': True,
-                'data': serializer.data
+                'data': serializer.data,
+                'total_count': total_count
             })
 
         except ValueError as e:
@@ -751,7 +755,6 @@ class UsersearchApiview(APIView):
                 'error': 'Internal server error',
                 'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class DeleteItemView(APIView):
     def delete(self, request, model_name, pk):
