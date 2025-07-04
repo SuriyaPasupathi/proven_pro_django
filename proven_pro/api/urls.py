@@ -19,7 +19,7 @@ from .views import (
     UserSearchFilterView,
     health_check,
     CheckProfileStatusView,
-    profile_share_actions,
+    ProfileShareActions,
     submit_profile_review,
     DropdownAPIView,
     SkillsDropdownAPIView,
@@ -58,7 +58,7 @@ urlpatterns = [
     path('', include(router.urls)),
 
     #profile
-    path('request-profile-share/', profile_share_actions.as_view(), name='request_profile_share'),
+    path('request-profile-share/', ProfileShareActions.as_view(), name='request_profile_share'),
     path('submit-profile-review/', submit_profile_review.as_view(), name='submit-profile-review'),
     
     path('profile/', UserProfileView.as_view(), name='user-profile'),
